@@ -1,0 +1,45 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.6.9/schema.json",
+	"files": {
+		"includes": ["src/**", "scripts/**", "public/**/*.js", "admin/**/*.js"]
+	},
+	"formatter": {
+		"enabled": false
+	},
+	"assist": {
+		"enabled": false
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"preset": "recommended",
+			"security": {
+				"noGlobalEval": "error",
+				"noDangerouslySetInnerHtml": "error"
+			},
+			"suspicious": {
+				"noExplicitAny": "error",
+				"noConsole": "off"
+			},
+			"correctness": {
+				"noUnusedVariables": "error",
+				"noUnusedImports": "error"
+			},
+			"style": {
+				"noNonNullAssertion": "off"
+			}
+		}
+	},
+	"overrides": [
+		{
+			"includes": ["public/**/*.js", "admin/**/*.js"],
+			"linter": {
+				"rules": {
+					"correctness": {
+						"noUnusedVariables": "off"
+					}
+				}
+			}
+		}
+	]
+}

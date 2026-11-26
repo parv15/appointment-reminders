@@ -14,13 +14,18 @@
     "start": "node --env-file-if-exists=.env dist/server.js",
     "typecheck": "tsc --noEmit && tsc --noEmit -p scripts/tsconfig.json",
     "setup:templates": "tsx --env-file=.env scripts/setup.ts templates",
-    "setup:webhook": "tsx --env-file=.env scripts/setup.ts webhook"
+    "setup:webhook": "tsx --env-file=.env scripts/setup.ts webhook",
+    "lint": "biome lint .",
+    "lint:prose": "tsx scripts/lint-prose.ts",
+    "audit:deps": "npm audit --audit-level=high",
+    "check": "npm run typecheck && npm run lint && npm run lint:prose && npm run audit:deps"
   },
   "dependencies": {
     "@sentdm/sentdm": "^0.55.0",
     "express": "^5.1.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.9",
     "@types/express": "^5.0.0",
     "@types/node": "^22.13.0",
     "tsx": "^4.19.0",

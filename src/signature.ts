@@ -18,7 +18,7 @@ export function verifyWebhook(
 
   const key = Buffer.from(secret.replace(/^whsec_/, ''), 'base64');
   const signed = `${headers.id}.${headers.timestamp}.${rawBody.toString('utf8')}`;
-  const expected = Buffer.from('v1,' + createHmac('sha256', key).update(signed).digest('base64'));
+  const expected = Buffer.from(`v1,${createHmac('sha256', key).update(signed).digest('base64')}`);
 
   return headers.signature
     .trim()

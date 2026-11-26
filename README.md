@@ -313,7 +313,7 @@ The dashboard and every admin API sit behind a sign-in page when `ADMIN_PASSWORD
 
 The public booking endpoints only return the booking you made, found by its random id, and they never list other bookings. One connection can make 10 booking requests per hour and one phone number can hold 3 upcoming appointments, which stops the form from being used to send texts to strangers. Phone numbers are validated as E.164 and names are validated against the pattern the Sent templates accept before anything is sent. A number typed with a plus sign or a leading 00 is used as written, and otherwise the selected country code is added.
 
-Secrets come only from environment variables, and `.env`, the database and build output are in `.gitignore`. The app has no analytics and loads no third-party script. The only font is bundled together with its licence.
+Secrets come only from environment variables, and `.env`, the database and build output are in `.gitignore`. Dependabot, `npm audit`, CodeQL and GitHub secret scanning watch the repository, and [SECURITY.md](SECURITY.md) says how to report a problem. The app has no analytics and loads no third-party script. The only font is bundled together with its licence.
 
 ## Configuration
 

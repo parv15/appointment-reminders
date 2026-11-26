@@ -9,7 +9,9 @@
 
 ## Checks
 
-`npm run typecheck` and `npm run build` must pass before you open a pull request. CI runs the same two commands.
+Run `npm run check` before you open a pull request. It runs the typecheck, the Biome lint, the prose check and `npm audit`. CI runs the same steps and also runs `npm run build`.
+
+The prose check (`npm run lint:prose`) fails on dashes, stock marketing words, "not just X but Y" phrasing, placeholder names and bold-label bullets. It is a local pattern check and not a statistical AI detector, so it catches the habits that make text read as machine-written. Add `lint-prose: ignore` to a line that has to stay as it is.
 
 ## Pull requests
 
