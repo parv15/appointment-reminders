@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640" role="img" aria-labelledby="t">
+  <title id="t">Appointment reminders with reply handling</title>
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#f0efef" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="1280" height="640" fill="#fdfcfc"/>
+  <rect width="1280" height="640" fill="url(#grid)"/>
+  <rect x="0.5" y="0.5" width="1279" height="639" fill="none" stroke="#f0efef"/>
+  <text x="640" y="248" text-anchor="middle" font-family="Inter,system-ui,-apple-system,'Segoe UI',sans-serif" font-weight="300" letter-spacing="-2" font-size="80" fill="#130f0c">Appointment reminders</text>
+  <text x="640" y="336" text-anchor="middle" font-family="Inter,system-ui,-apple-system,'Segoe UI',sans-serif" font-weight="300" letter-spacing="-2" font-size="80" fill="#6b6560">with reply handling</text>
+  <text x="640" y="402" text-anchor="middle" font-family="Inter,system-ui,-apple-system,'Segoe UI',sans-serif" font-size="26" fill="#6b6560">Book online. Confirm and remind by text. Customers reply C or R.</text>
+  <rect x="530.500" y="440.500" width="219" height="40" rx="20" fill="#fdfcfc" stroke="#dedcdc"/>
+  <text x="640" y="466" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="15" fill="#6b6560">Built on the Sent API</text>
+</svg>

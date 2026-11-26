@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 420" width="1100" height="420" role="img" aria-labelledby="t">
+  <title id="t">Booking, confirmation, reminder and reply flow</title>
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0L10 5L0 10z" fill="#130f0c"/>
+    </marker>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0L10 5L0 10z" fill="#266df0"/>
+    </marker>
+  </defs>
+  <rect width="1100" height="420" fill="#fdfcfc"/>
+  <g stroke="#dedcdc" stroke-width="1">
+    <line x1="100" y1="70" x2="100" y2="410"/>
+    <line x1="400" y1="70" x2="400" y2="410"/>
+    <line x1="700" y1="70" x2="700" y2="410"/>
+    <line x1="1000" y1="70" x2="1000" y2="410"/>
+  </g>
+  <g fill="#ffffff" stroke="#dedcdc" stroke-width="1">
+    <rect x="20.500" y="22.500" width="160" height="48" rx="10"/>
+    <rect x="320.500" y="22.500" width="160" height="48" rx="10"/>
+    <rect x="620.500" y="22.500" width="160" height="48" rx="10"/>
+    <rect x="920.500" y="22.500" width="160" height="48" rx="10"/>
+  </g>
+  <g font-family="ui-monospace,Menlo,monospace" font-size="13" fill="#6b6560" text-anchor="middle">
+    <text x="100" y="51">CUSTOMER</text>
+    <text x="400" y="51">THIS APP</text>
+    <text x="700" y="51">SENT</text>
+    <text x="1000" y="51">CUSTOMER PHONE</text>
+  </g>
+  <g stroke="#130f0c" stroke-width="1.5" fill="none">
+    <line x1="100" y1="115" x2="396" y2="115" marker-end="url(#ah)"/>
+    <line x1="400" y1="155" x2="696" y2="155" marker-end="url(#ah)"/>
+    <line x1="400" y1="195" x2="696" y2="195" marker-end="url(#ah)"/>
+    <line x1="700" y1="235" x2="996" y2="235" marker-end="url(#ah)"/>
+    <line x1="700" y1="275" x2="996" y2="275" marker-end="url(#ah)"/>
+    <line x1="700" y1="355" x2="404" y2="355" marker-end="url(#ah)"/>
+  </g>
+  <g stroke="#266df0" stroke-width="1.5" fill="none">
+    <line x1="1000" y1="315" x2="704" y2="315" marker-end="url(#ab)"/>
+    <line x1="400" y1="395" x2="996" y2="395" marker-end="url(#ab)"/>
+  </g>
+  <g font-family="Inter,system-ui,-apple-system,'Segoe UI',sans-serif" font-size="14" fill="#130f0c">
+    <text x="132" y="107">Book a slot</text>
+    <text x="432" y="147">Save booking and send confirmation</text>
+    <text x="432" y="187">Schedule reminder with scheduled_at</text>
+    <text x="732" y="227">Confirmation text delivered</text>
+    <text x="732" y="267">Reminder text at reminder time</text>
+    <text x="968" y="307" text-anchor="end">Customer replies C or R</text>
+    <text x="668" y="347" text-anchor="end">Signed webhook message.received</text>
+    <text x="432" y="387">Update status and answer on the same channel</text>
+  </g>
+  <g fill="#130f0c">
+    <circle cx="116" cy="115" r="10"/>
+    <circle cx="416" cy="155" r="10"/>
+    <circle cx="416" cy="195" r="10"/>
+    <circle cx="716" cy="235" r="10"/>
+    <circle cx="716" cy="275" r="10"/>
+    <circle cx="984" cy="315" r="10"/>
+    <circle cx="684" cy="355" r="10"/>
+    <circle cx="416" cy="395" r="10"/>
+  </g>
+  <g font-family="Inter,system-ui,-apple-system,'Segoe UI',sans-serif" font-size="12" font-weight="600" fill="#fdfcfc" text-anchor="middle">
+    <text x="116" y="119.500">1</text>
+    <text x="416" y="159.500">2</text>
+    <text x="416" y="199.500">3</text>
+    <text x="716" y="239.500">4</text>
+    <text x="716" y="279.500">5</text>
+    <text x="984" y="319.500">6</text>
+    <text x="684" y="359.500">7</text>
+    <text x="416" y="399.500">8</text>
+  </g>
+</svg>

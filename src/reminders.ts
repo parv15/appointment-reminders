@@ -12,6 +12,8 @@ const SCHEDULED_POLL_INTERVAL_MS = 60_000;
 
 export class ValidationError extends Error {}
 
+class NoticeError extends Error {}
+
 export interface InboundPayload {
   inbound_number: string;
   channel: string;
@@ -23,15 +25,22 @@ export interface BookingRequest {
   service: string;
   phone: string;
   startsAt: string;
+  reminderMinutes?: number;
+}
+
+export interface RescheduleRequest {
+  startsAt: string;
+  reminderMinutes?: number;
 }
 
 export type BookingResult = Appointment & { confirmationError?: string };
 
 export interface Reminders {
   book(request: BookingRequest): Promise<BookingResult>;
+  reschedule(id: string, request: RescheduleRequest): Promise<BookingResult | undefined>;
   cancel(id: string): Promise<Appointment | undefined>;
   handleInbound(payload: InboundPayload): Promise<void>;
-  handleStatus(event: string, payload: { message_id?: string }): void;
+  handleStatus(event: string, payload: { message_id?: string; channel?: string }): void;
   syncStatuses(): Promise<void>;
 }
 
@@ -46,61 +55,125 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
     return { date: format({ dateStyle: 'medium' }), time: format({ timeStyle: 'short' }) };
   };
 
+  const textParameters = (appointment: Appointment) => {
+    const { date, time } = formatInZone(appointment.startsAt);
+    return { customer_name: appointment.name, business_name: config.businessName, appointment_date: date, appointment_time: time };
+  };
+
   const reply = (to: string, channel: string, text: string) => messenger.send({ to, channel, text });
 
-  async function sendReminder(appointment: Appointment, parameters: Record<string, string>, releaseAt: number) {
-    const messageId = await messenger.send({
-      to: appointment.phone,
-      template: { name: config.templateName, parameters },
-      ...(releaseAt - Date.now() >= MIN_SCHEDULE_AHEAD_MS && { scheduledAt: new Date(releaseAt) }),
-      idempotencyKey: `reminder-${appointment.id}`,
-    });
-    store.setReminder(appointment.id, messageId);
+  function chooseLead(startsAt: Date, requested?: number): number {
+    const now = Date.now();
+    const feasible = (lead: number) => startsAt.getTime() - lead * 60_000 - now >= MIN_SCHEDULE_AHEAD_MS;
+
+    if (requested !== undefined) {
+      if (!config.reminderOptions.includes(requested)) {
+        throw new ValidationError('Choose one of the offered reminder times.');
+      }
+      if (!feasible(requested)) {
+        throw new ValidationError('That reminder time has already passed. Choose a shorter reminder or a later appointment.');
+      }
+      return requested;
+    }
+
+    const lead = config.reminderOptions.find(feasible);
+    if (lead === undefined) {
+      throw new ValidationError('That appointment is too soon for a reminder. Choose a later time.');
+    }
+    return lead;
   }
 
-  async function sendBookingAlert(appointment: Appointment, parameters: Record<string, string>): Promise<string | undefined> {
-    if (!config.confirmationTemplateName) return undefined;
+  function assertSchedulable(startsAt: Date, lead: number) {
+    if (startsAt.getTime() <= Date.now()) {
+      throw new ValidationError('The appointment time must be in the future.');
+    }
+    if (startsAt.getTime() - lead * 60_000 - Date.now() > MAX_SCHEDULE_AHEAD_MS) {
+      throw new ValidationError('Reminders can be scheduled at most 30 days ahead. Pick a sooner appointment time.');
+    }
+  }
+
+  async function scheduleReminder(appointment: Appointment, lead: number, key: string): Promise<string> {
+    return messenger.send({
+      to: appointment.phone,
+      template: { name: config.templateName, parameters: textParameters(appointment) },
+      scheduledAt: new Date(new Date(appointment.startsAt).getTime() - lead * 60_000),
+      idempotencyKey: key,
+    });
+  }
+
+  async function sendNotice(appointment: Appointment, templateName: string, key: string, extra: Record<string, string> = {}) {
+    if (!templateName) return undefined;
     try {
-      const messageId = await messenger.send({
+      return await messenger.send({
         to: appointment.phone,
-        template: { name: config.confirmationTemplateName, parameters: { ...parameters, service_name: appointment.service } },
-        idempotencyKey: `confirmation-${appointment.id}`,
+        template: { name: templateName, parameters: { ...textParameters(appointment), ...extra } },
+        idempotencyKey: key,
       });
-      store.setConfirmation(appointment.id, messageId);
-      return undefined;
     } catch (err) {
-      const reason = explainSentError(err)?.message ?? 'The booking alert could not be sent.';
-      console.error(`Booking alert for ${appointment.id} failed: ${reason}`);
-      return reason;
+      const reason = explainSentError(err)?.message ?? 'The text could not be sent.';
+      console.error(`Text for ${appointment.id} failed: ${reason}`);
+      throw new NoticeError(reason);
     }
   }
 
   return {
-    async book({ name, service, phone, startsAt: requested }) {
+    async book({ name, service, phone, startsAt: requested, reminderMinutes }) {
       const start = new Date(requested);
-      const releaseAt = start.getTime() - config.reminderLeadMinutes * 60_000;
-      if (start.getTime() <= Date.now()) {
-        throw new ValidationError('The appointment time must be in the future.');
-      }
-      if (releaseAt - Date.now() > MAX_SCHEDULE_AHEAD_MS) {
-        throw new ValidationError('Reminders can be scheduled at most 30 days ahead. Pick a sooner appointment time.');
-      }
+      const lead = chooseLead(start, reminderMinutes);
+      assertSchedulable(start, lead);
       if (store.takenStarts().has(start.toISOString())) {
         throw new ValidationError('That time was just taken. Please pick another slot.');
       }
 
-      const appointment = store.create({ name, service, phone, startsAt: start.toISOString() });
-      const { date, time } = formatInZone(appointment.startsAt);
-      const parameters = { customer_name: name, business_name: config.businessName, appointment_date: date, appointment_time: time };
-
+      const appointment = store.create({ name, service, phone, startsAt: start.toISOString(), reminderLeadMinutes: lead });
       try {
-        await sendReminder(appointment, parameters, releaseAt);
+        store.setReminder(appointment.id, await scheduleReminder(appointment, lead, `reminder-${appointment.id}`));
       } catch (err) {
         store.delete(appointment.id);
         throw err;
       }
-      const confirmationError = await sendBookingAlert(appointment, parameters);
+
+      let confirmationError: string | undefined;
+      try {
+        const messageId = await sendNotice(appointment, config.confirmationTemplateName, `confirmation-${appointment.id}`, { service_name: service });
+        if (messageId) store.setConfirmation(appointment.id, messageId);
+      } catch (err) {
+        confirmationError = err instanceof NoticeError ? err.message : 'The booking text could not be sent.';
+      }
       return { ...store.get(appointment.id)!, ...(confirmationError && { confirmationError }) };
+    },
+
+    async reschedule(id, { startsAt: requested, reminderMinutes }) {
+      const current = store.get(id);
+      if (!current || current.status === 'cancelled') return undefined;
+
+      const start = new Date(requested);
+      const lead = chooseLead(start, reminderMinutes ?? current.reminderLeadMinutes ?? undefined);
+      assertSchedulable(start, lead);
+      if (store.takenStarts(id).has(start.toISOString())) {
+        throw new ValidationError('That time is taken. Pick another slot.');
+      }
+
+      const moved = { ...current, startsAt: start.toISOString() };
+      const newReminderId = await scheduleReminder(moved, lead, `reminder-${id}-${start.getTime()}`);
+      try {
+        if (current.reminderMessageId) await messenger.cancel(current.reminderMessageId);
+      } catch (err) {
+        await messenger.cancel(newReminderId).catch(() => undefined);
+        throw err;
+      }
+
+      store.reschedule(id, moved.startsAt, lead);
+      store.setReminder(id, newReminderId);
+
+      let confirmationError: string | undefined;
+      try {
+        const messageId = await sendNotice(moved, config.rescheduleTemplateName, `reschedule-${id}-${start.getTime()}`);
+        if (messageId) store.setConfirmation(id, messageId);
+      } catch (err) {
+        confirmationError = err instanceof NoticeError ? err.message : 'The reschedule text could not be sent.';
+      }
+      return { ...store.get(id)!, ...(confirmationError && { confirmationError }) };
     },
 
     async cancel(id) {
@@ -135,31 +208,31 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
 
     handleStatus(event, payload) {
       if (payload.message_id) {
-        store.setMessageStatus(payload.message_id, event.replace(/^message\./, ''));
+        store.setMessageStatus(payload.message_id, event.replace(/^message\./, ''), payload.channel?.toLowerCase());
       }
     },
 
     async syncStatuses() {
-      if (!messenger.status || config.sandbox) return;
-      const lookup = messenger.status.bind(messenger);
+      if (config.sandbox) return;
       const now = Date.now();
 
       const tracked = store
         .list()
         .filter((a) => a.status !== 'cancelled')
         .flatMap((a) => [
-          { id: a.reminderMessageId, status: a.reminderStatus },
-          { id: a.confirmationMessageId, status: a.confirmationStatus },
+          { id: a.reminderMessageId, status: a.reminderStatus, channel: a.reminderChannel },
+          { id: a.confirmationMessageId, status: a.confirmationStatus, channel: a.confirmationChannel },
         ]);
 
       await Promise.allSettled(
         tracked
-          .filter((m): m is { id: string; status: string | null } => m.id !== null && !FINAL_STATUSES.has(m.status ?? ''))
+          .filter((m): m is { id: string; status: string | null; channel: string | null } => m.id !== null)
+          .filter((m) => !FINAL_STATUSES.has(m.status ?? '') || (m.channel === null && !lastPolled.has(m.id)))
           .filter((m) => now - (lastPolled.get(m.id) ?? 0) > (m.status === 'scheduled' ? SCHEDULED_POLL_INTERVAL_MS : POLL_INTERVAL_MS))
           .map(async ({ id }) => {
             lastPolled.set(id, now);
-            const status = await lookup(id);
-            if (status) store.setMessageStatus(id, status);
+            const { status, channel } = await messenger.status(id);
+            if (status) store.setMessageStatus(id, status, channel);
           }),
       );
     },

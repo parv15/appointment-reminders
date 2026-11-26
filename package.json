@@ -11,8 +11,10 @@
   "scripts": {
     "dev": "tsx watch --env-file=.env src/server.ts",
     "build": "tsc",
-    "start": "node --env-file=.env dist/server.js",
-    "typecheck": "tsc --noEmit"
+    "start": "node --env-file-if-exists=.env dist/server.js",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p scripts/tsconfig.json",
+    "setup:templates": "tsx --env-file=.env scripts/setup.ts templates",
+    "setup:webhook": "tsx --env-file=.env scripts/setup.ts webhook"
   },
   "dependencies": {
     "@sentdm/sentdm": "^0.55.0",

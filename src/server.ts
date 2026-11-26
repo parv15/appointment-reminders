@@ -24,8 +24,7 @@ function readConfig(): Config {
 async function connectToSent(config: Config) {
   const sent = createSentMessenger({
     sandbox: config.sandbox,
-    templateName: config.templateName,
-    confirmationTemplateName: config.confirmationTemplateName,
+    templates: { reminder: config.templateName, confirmation: config.confirmationTemplateName, reschedule: config.rescheduleTemplateName },
   });
 
   try {
@@ -54,7 +53,7 @@ const store = new Store(config.databasePath);
 const messenger = await connectToSent(config);
 const reminders = createReminders({ store, messenger, config });
 
-const server = createApp({ store, reminders, config }).listen(config.port, (err?: NodeJS.ErrnoException) => {
+const server = createApp({ store, reminders, config, templateReport: () => messenger.templateReport() }).listen(config.port, (err?: NodeJS.ErrnoException) => {
   if (err) {
     fail(err.code === 'EADDRINUSE' ? `Port ${config.port} is already in use. Set PORT to another value.` : `Cannot listen on port ${config.port}: ${err.message}`);
   }

@@ -12,12 +12,15 @@ export interface Appointment {
   phone: string;
   startsAt: string;
   status: AppointmentStatus;
+  reminderLeadMinutes: number | null;
   reminderMessageId: string | null;
   reminderStatus: string | null;
-  lastReply: string | null;
-  lastReplyAt: string | null;
+  reminderChannel: string | null;
   confirmationMessageId: string | null;
   confirmationStatus: string | null;
+  confirmationChannel: string | null;
+  lastReply: string | null;
+  lastReplyAt: string | null;
   createdAt: string;
 }
 
@@ -28,14 +31,28 @@ interface Row {
   phone: string;
   starts_at: string;
   status: AppointmentStatus;
+  reminder_lead_minutes: number | null;
   reminder_message_id: string | null;
   reminder_status: string | null;
-  last_reply: string | null;
-  last_reply_at: string | null;
+  reminder_channel: string | null;
   confirmation_message_id: string | null;
   confirmation_status: string | null;
+  confirmation_channel: string | null;
+  last_reply: string | null;
+  last_reply_at: string | null;
   created_at: string;
 }
+
+const COLUMNS: Record<string, string> = {
+  service: 'TEXT',
+  last_reply: 'TEXT',
+  last_reply_at: 'TEXT',
+  confirmation_message_id: 'TEXT',
+  confirmation_status: 'TEXT',
+  reminder_lead_minutes: 'INTEGER',
+  reminder_channel: 'TEXT',
+  confirmation_channel: 'TEXT',
+};
 
 const toAppointment = (row: Row): Appointment => ({
   id: row.id,
@@ -44,12 +61,15 @@ const toAppointment = (row: Row): Appointment => ({
   phone: row.phone,
   startsAt: row.starts_at,
   status: row.status,
+  reminderLeadMinutes: row.reminder_lead_minutes,
   reminderMessageId: row.reminder_message_id,
   reminderStatus: row.reminder_status,
-  lastReply: row.last_reply,
-  lastReplyAt: row.last_reply_at,
+  reminderChannel: row.reminder_channel,
   confirmationMessageId: row.confirmation_message_id,
   confirmationStatus: row.confirmation_status,
+  confirmationChannel: row.confirmation_channel,
+  lastReply: row.last_reply,
+  lastReplyAt: row.last_reply_at,
   createdAt: row.created_at,
 });
 
@@ -65,46 +85,44 @@ export class Store {
       CREATE TABLE IF NOT EXISTS appointments (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
-        service TEXT,
         phone TEXT NOT NULL,
         starts_at TEXT NOT NULL,
         status TEXT NOT NULL,
         reminder_message_id TEXT,
         reminder_status TEXT,
-        last_reply TEXT,
-        last_reply_at TEXT,
-        confirmation_message_id TEXT,
-        confirmation_status TEXT,
         created_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS appointments_phone ON appointments (phone);
       CREATE INDEX IF NOT EXISTS appointments_reminder ON appointments (reminder_message_id);
       CREATE TABLE IF NOT EXISTS seen_events (id TEXT PRIMARY KEY);
     `);
-    const columns = (this.db.prepare('PRAGMA table_info(appointments)').all() as unknown as { name: string }[]).map((c) => c.name);
-    for (const column of ['service', 'last_reply', 'last_reply_at', 'confirmation_message_id', 'confirmation_status']) {
-      if (!columns.includes(column)) {
-        this.db.exec(`ALTER TABLE appointments ADD COLUMN ${column} TEXT`);
+
+    const existing = (this.db.prepare('PRAGMA table_info(appointments)').all() as unknown as { name: string }[]).map((c) => c.name);
+    for (const [column, type] of Object.entries(COLUMNS)) {
+      if (!existing.includes(column)) {
+        this.db.exec(`ALTER TABLE appointments ADD COLUMN ${column} ${type}`);
       }
     }
   }
 
-  create(input: { name: string; service: string; phone: string; startsAt: string }): Appointment {
+  create(input: { name: string; service: string; phone: string; startsAt: string; reminderLeadMinutes: number }): Appointment {
     const appointment: Appointment = {
       id: randomUUID(),
       ...input,
       status: 'scheduled',
       reminderMessageId: null,
       reminderStatus: null,
-      lastReply: null,
-      lastReplyAt: null,
+      reminderChannel: null,
       confirmationMessageId: null,
       confirmationStatus: null,
+      confirmationChannel: null,
+      lastReply: null,
+      lastReplyAt: null,
       createdAt: new Date().toISOString(),
     };
     this.db
-      .prepare('INSERT INTO appointments (id, name, service, phone, starts_at, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .run(appointment.id, appointment.name, appointment.service, appointment.phone, appointment.startsAt, appointment.status, appointment.createdAt);
+      .prepare('INSERT INTO appointments (id, name, service, phone, starts_at, status, reminder_lead_minutes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(appointment.id, appointment.name, appointment.service, appointment.phone, appointment.startsAt, appointment.status, appointment.reminderLeadMinutes, appointment.createdAt);
     return appointment;
   }
 
@@ -118,8 +136,10 @@ export class Store {
     return rows.map(toAppointment);
   }
 
-  takenStarts(): Set<string> {
-    const rows = this.db.prepare("SELECT starts_at FROM appointments WHERE status != 'cancelled'").all() as unknown as { starts_at: string }[];
+  takenStarts(excludeId?: string): Set<string> {
+    const rows = this.db
+      .prepare("SELECT starts_at FROM appointments WHERE status != 'cancelled' AND id != ?")
+      .all(excludeId ?? '') as unknown as { starts_at: string }[];
     return new Set(rows.map((r) => r.starts_at));
   }
 
@@ -131,7 +151,19 @@ export class Store {
   }
 
   setReminder(id: string, messageId: string): void {
-    this.db.prepare("UPDATE appointments SET reminder_message_id = ?, reminder_status = 'queued' WHERE id = ?").run(messageId, id);
+    this.db
+      .prepare("UPDATE appointments SET reminder_message_id = ?, reminder_status = 'queued', reminder_channel = NULL WHERE id = ?")
+      .run(messageId, id);
+  }
+
+  setConfirmation(id: string, messageId: string): void {
+    this.db.prepare("UPDATE appointments SET confirmation_message_id = ?, confirmation_status = 'queued' WHERE id = ?").run(messageId, id);
+  }
+
+  reschedule(id: string, startsAt: string, reminderLeadMinutes: number): void {
+    this.db
+      .prepare("UPDATE appointments SET starts_at = ?, reminder_lead_minutes = ?, status = 'scheduled', last_reply = NULL, last_reply_at = NULL WHERE id = ?")
+      .run(startsAt, reminderLeadMinutes, id);
   }
 
   delete(id: string): void {
@@ -146,13 +178,13 @@ export class Store {
     this.db.prepare('UPDATE appointments SET last_reply = ?, last_reply_at = ? WHERE id = ?').run(text.slice(0, 200), at.toISOString(), id);
   }
 
-  setConfirmation(id: string, messageId: string): void {
-    this.db.prepare("UPDATE appointments SET confirmation_message_id = ?, confirmation_status = 'queued' WHERE id = ?").run(messageId, id);
-  }
-
-  setMessageStatus(messageId: string, status: string): void {
-    this.db.prepare('UPDATE appointments SET reminder_status = ? WHERE reminder_message_id = ?').run(status, messageId);
-    this.db.prepare('UPDATE appointments SET confirmation_status = ? WHERE confirmation_message_id = ?').run(status, messageId);
+  setMessageStatus(messageId: string, status: string, channel?: string): void {
+    this.db
+      .prepare('UPDATE appointments SET reminder_status = ?, reminder_channel = COALESCE(?, reminder_channel) WHERE reminder_message_id = ?')
+      .run(status, channel ?? null, messageId);
+    this.db
+      .prepare('UPDATE appointments SET confirmation_status = ?, confirmation_channel = COALESCE(?, confirmation_channel) WHERE confirmation_message_id = ?')
+      .run(status, channel ?? null, messageId);
   }
 
   markEventSeen(eventId: string): boolean {

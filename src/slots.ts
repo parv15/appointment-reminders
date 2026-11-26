@@ -31,6 +31,7 @@ export interface SlotRules {
   endHour: number;
   slotMinutes: number;
   maxAdvanceDays: number;
+  minNoticeMinutes: number;
 }
 
 export function availableSlots(date: string, rules: SlotRules, taken: Set<string>, now: Date): Date[] {
@@ -41,7 +42,7 @@ export function availableSlots(date: string, rules: SlotRules, taken: Set<string
   const slots: Date[] = [];
   for (let minutes = rules.startHour * 60; minutes + rules.slotMinutes <= rules.endHour * 60; minutes += rules.slotMinutes) {
     const slot = zonedTime(date, Math.floor(minutes / 60), minutes % 60, rules.timezone);
-    if (slot.getTime() > now.getTime() + 60 * 60_000 && !taken.has(slot.toISOString())) {
+    if (slot.getTime() > now.getTime() + rules.minNoticeMinutes * 60_000 && !taken.has(slot.toISOString())) {
       slots.push(slot);
     }
   }

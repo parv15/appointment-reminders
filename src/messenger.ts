@@ -9,23 +9,45 @@ export interface SendRequest {
   idempotencyKey?: string;
 }
 
+export interface MessageStatus {
+  status?: string;
+  channel?: string;
+}
+
+export interface TemplateReport {
+  purpose: string;
+  preferred: string;
+  preferredStatus: string;
+  using: string;
+}
+
 export interface Messenger {
   send(request: SendRequest): Promise<string>;
   cancel(messageId: string): Promise<void>;
-  status?(messageId: string): Promise<string | undefined>;
-}
-
-export interface SentMessenger extends Messenger {
+  status(messageId: string): Promise<MessageStatus>;
+  templateReport(): Promise<TemplateReport[]>;
   verify(): Promise<string[]>;
 }
 
+export interface TemplateLists {
+  reminder: string;
+  confirmation: string;
+  reschedule: string;
+}
+
 const STATUS_TTL_MS = 5 * 60_000;
+const DELIVERY_CHANNELS = new Set(['sms', 'mms', 'whatsapp', 'rcs']);
+const PURPOSES: Record<keyof TemplateLists, string> = {
+  reminder: 'Reminder',
+  confirmation: 'Booking confirmation',
+  reschedule: 'Reschedule notice',
+};
 
 const names = (list: string) => list.split(',').map((n) => n.trim()).filter(Boolean);
 
-export function createSentMessenger(options: { sandbox: boolean; templateName: string; confirmationTemplateName: string }): SentMessenger {
+export function createSentMessenger(options: { sandbox: boolean; templates: TemplateLists }): Messenger {
   const client = new SentDm();
-  const { sandbox, templateName, confirmationTemplateName } = options;
+  const { sandbox, templates } = options;
 
   let statuses = new Map<string, string | undefined>();
   let loadedAt = 0;
@@ -48,13 +70,12 @@ export function createSentMessenger(options: { sandbox: boolean; templateName: s
   async function resolve(list: string): Promise<string> {
     const candidates = names(list);
     if (candidates.length <= 1) return candidates[0] ?? list;
-    let known = statuses;
     try {
-      known = await templateStatuses();
+      const known = await templateStatuses();
+      return candidates.find((n) => known.get(n) === 'APPROVED') ?? candidates[0]!;
     } catch {
       return candidates[candidates.length - 1]!;
     }
-    return candidates.find((n) => known.get(n) === 'APPROVED') ?? candidates[0]!;
   }
 
   return {
@@ -88,23 +109,39 @@ export function createSentMessenger(options: { sandbox: boolean; templateName: s
 
     async status(messageId) {
       const response = await client.messages.retrieveStatus(messageId);
-      return response.data?.status?.toLowerCase();
+      const channel = response.data?.channel?.toLowerCase();
+      return { status: response.data?.status?.toLowerCase(), channel: channel && DELIVERY_CHANNELS.has(channel) ? channel : undefined };
+    },
+
+    async templateReport() {
+      const known = await templateStatuses();
+      const report: TemplateReport[] = [];
+      for (const key of Object.keys(PURPOSES) as (keyof TemplateLists)[]) {
+        const candidates = names(templates[key]);
+        const [preferred] = candidates;
+        if (!preferred) continue;
+        report.push({
+          purpose: PURPOSES[key],
+          preferred,
+          preferredStatus: known.get(preferred) ?? 'MISSING',
+          using: candidates.find((n) => known.get(n) === 'APPROVED') ?? preferred,
+        });
+      }
+      return report;
     },
 
     async verify() {
       const warnings: string[] = [];
       const known = await templateStatuses(true);
 
-      const wanted = [
-        { list: templateName, variable: 'SENT_TEMPLATE_NAME', purpose: 'reminders' },
-        ...(confirmationTemplateName ? [{ list: confirmationTemplateName, variable: 'SENT_CONFIRMATION_TEMPLATE', purpose: 'booking alerts' }] : []),
-      ];
-      for (const { list, variable, purpose } of wanted) {
-        const candidates = names(list);
+      for (const key of Object.keys(PURPOSES) as (keyof TemplateLists)[]) {
+        const candidates = names(templates[key]);
+        if (candidates.length === 0) continue;
         const approved = candidates.find((n) => known.get(n) === 'APPROVED');
+        const purpose = PURPOSES[key].toLowerCase();
         if (!approved) {
           const detail = candidates.map((n) => `${n} is ${known.get(n) ?? 'missing'}`).join(', ');
-          warnings.push(`No approved template for ${purpose} (${detail}). Live ${purpose} will be blocked. Check ${variable}.`);
+          warnings.push(`No approved template for ${purpose} (${detail}). Live ${purpose} texts will be blocked.`);
         } else if (approved !== candidates[0]) {
           warnings.push(`Using "${approved}" for ${purpose} until "${candidates[0]}" is approved (it is ${known.get(candidates[0]!) ?? 'missing'}).`);
         }

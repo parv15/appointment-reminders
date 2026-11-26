@@ -5,12 +5,14 @@ export interface Config {
   webhookSecret: string;
   templateName: string;
   confirmationTemplateName: string;
+  rescheduleTemplateName: string;
   businessName: string;
   services: string[];
   defaultCountryCode: string;
   adminPassword: string;
   slotRules: SlotRules;
-  reminderLeadMinutes: number;
+  reminderOptions: number[];
+  noReplyWarningHours: number;
   timezone: string;
   sandbox: boolean;
   databasePath: string;
@@ -51,9 +53,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     problems.push(`PORT must be a number between 1 and 65535, got "${env.PORT}"`);
   }
 
-  const reminderLeadMinutes = Number(env.REMINDER_LEAD_MINUTES ?? 1440);
-  if (!Number.isInteger(reminderLeadMinutes) || reminderLeadMinutes < 1) {
-    problems.push(`REMINDER_LEAD_MINUTES must be a positive whole number, got "${env.REMINDER_LEAD_MINUTES}"`);
+  const reminderOptions = [...new Set((env.REMINDER_OPTIONS ?? '1440,120,60').split(',').map((v) => Number(v.trim())))].sort((a, b) => b - a);
+  if (reminderOptions.some((m) => !Number.isInteger(m) || m < 5 || m > 20_000)) {
+    problems.push(`REMINDER_OPTIONS must be whole minutes between 5 and 20000, separated by commas, got "${env.REMINDER_OPTIONS}"`);
+  }
+
+  const noReplyWarningHours = Number(env.NO_REPLY_WARNING_HOURS ?? 3);
+  if (!Number.isFinite(noReplyWarningHours) || noReplyWarningHours <= 0) {
+    problems.push(`NO_REPLY_WARNING_HOURS must be a positive number, got "${env.NO_REPLY_WARNING_HOURS}"`);
   }
 
   const timezone = env.BUSINESS_TIMEZONE ?? 'UTC';
@@ -85,12 +92,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     webhookSecret,
     templateName: env.SENT_TEMPLATE_NAME ?? 'appointment_reminder_reply,sent_Appointment_Reminder_2',
     confirmationTemplateName: env.SENT_CONFIRMATION_TEMPLATE ?? 'appointment_confirmation_reply,sent_Appointment_Confirmation_1',
+    rescheduleTemplateName: env.SENT_RESCHEDULE_TEMPLATE ?? 'sent_Appointment_Reschedule_1',
     businessName,
     services,
     defaultCountryCode: env.DEFAULT_COUNTRY_CODE ?? '+1',
     adminPassword: env.ADMIN_PASSWORD ?? '',
-    slotRules: { timezone, startHour, endHour, slotMinutes, maxAdvanceDays: 14 },
-    reminderLeadMinutes,
+    slotRules: { timezone, startHour, endHour, slotMinutes, maxAdvanceDays: 14, minNoticeMinutes: Math.min(...reminderOptions) + 5 },
+    reminderOptions,
+    noReplyWarningHours,
     timezone,
     sandbox: env.SENT_SANDBOX === 'true',
     databasePath: env.DATABASE_PATH ?? './data/appointments.db',

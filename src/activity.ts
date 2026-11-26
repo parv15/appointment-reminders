@@ -9,10 +9,11 @@ export interface ActivityItem {
   service: string;
   startsAt: string;
   status?: string;
+  channel?: string;
   detail?: string;
 }
 
-export function buildActivity(appointments: Appointment[], reminderLeadMinutes: number, now = new Date(), limit = 60): ActivityItem[] {
+export function buildActivity(appointments: Appointment[], defaultLeadMinutes: number, now = new Date(), limit = 60): ActivityItem[] {
   const items: ActivityItem[] = [];
 
   for (const a of appointments) {
@@ -20,10 +21,16 @@ export function buildActivity(appointments: Appointment[], reminderLeadMinutes: 
     items.push({ ...base, at: a.createdAt, kind: 'booked' });
 
     if (a.confirmationMessageId) {
-      items.push({ ...base, at: a.createdAt, kind: 'alert', status: a.confirmationStatus ?? 'queued' });
+      items.push({
+        ...base,
+        at: a.createdAt,
+        kind: 'alert',
+        status: a.confirmationStatus ?? 'queued',
+        ...(a.confirmationChannel && { channel: a.confirmationChannel }),
+      });
     }
     if (a.reminderMessageId) {
-      const releaseAt = new Date(new Date(a.startsAt).getTime() - reminderLeadMinutes * 60_000);
+      const releaseAt = new Date(new Date(a.startsAt).getTime() - (a.reminderLeadMinutes ?? defaultLeadMinutes) * 60_000);
       const released = releaseAt <= now && releaseAt > new Date(a.createdAt);
       items.push({
         ...base,
@@ -31,6 +38,7 @@ export function buildActivity(appointments: Appointment[], reminderLeadMinutes: 
         kind: 'reminder',
         status: a.reminderStatus ?? 'queued',
         detail: releaseAt.toISOString(),
+        ...(a.reminderChannel && { channel: a.reminderChannel }),
       });
     }
     if (a.lastReply && a.lastReplyAt) {

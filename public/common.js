@@ -4,6 +4,18 @@ const STATUS_LABELS = { processed: 'queued', routed: 'sending' };
 const label = (value) => STATUS_LABELS[value] ?? (value ?? 'none').replaceAll('_', ' ');
 const initials = (name) => name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
 
+function statusTone(status) {
+  if (['confirmed', 'delivered', 'read', 'sent'].includes(status)) return 'good';
+  if (['reschedule_requested'].includes(status)) return 'warn';
+  if (['failed', 'blocked', 'cancelled'].includes(status)) return 'bad';
+  if (['queued', 'scheduled', 'processed', 'routed'].includes(status)) return 'info';
+  return '';
+}
+
+function pill(text, status, extra = '') {
+  return el('span', `pill ${statusTone(status)} ${extra}`.trim(), text);
+}
+
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -11,11 +23,39 @@ function el(tag, className, text) {
   return node;
 }
 
+function rollify(root = document) {
+  for (const btn of root.querySelectorAll('.btn[data-roll]:not([data-rolled])')) {
+    const text = btn.textContent.trim();
+    const roll = el('span', 'roll');
+    roll.setAttribute('aria-hidden', 'true');
+    [...text].forEach((char, i) => {
+      const c = el('span', 'c', char);
+      c.dataset.c = char;
+      c.style.setProperty('--i', i);
+      roll.append(c);
+    });
+    btn.setAttribute('aria-label', text);
+    btn.replaceChildren(roll);
+    btn.dataset.rolled = 'true';
+  }
+}
+
+function restartRise(root) {
+  for (const node of root.querySelectorAll('.rise')) {
+    node.style.animation = 'none';
+    void node.offsetWidth;
+    node.style.animation = '';
+  }
+}
+
 let toastTimer;
 function showError(message) {
   const toast = $('toast');
   toast.textContent = message;
   toast.hidden = false;
+  toast.style.animation = 'none';
+  void toast.offsetWidth;
+  toast.style.animation = '';
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => (toast.hidden = true), 8000);
 }

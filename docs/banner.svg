@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 400" width="1280" height="400" role="img" aria-labelledby="t d">
+  <title id="t">Appointment reminders with reply handling</title>
+  <desc id="d">Booking confirmation and reminder text messages, with a customer reply of C.</desc>
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#f0efef" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="1280" height="400" fill="#fdfcfc"/>
+  <rect width="1280" height="400" fill="url(#grid)"/>
+  <rect x="0.5" y="0.5" width="1279" height="399" fill="none" stroke="#f0efef"/>
+  <text x="80" y="150" font-family="Inter,system-ui,-apple-system,'Segoe UI',sans-serif" font-weight="300" letter-spacing="-2" font-size="64" fill="#130f0c">Appointment reminders</text>
+  <text x="80" y="220" font-family="Inter,system-ui,-apple-system,'Segoe UI',sans-serif" font-weight="300" letter-spacing="-2" font-size="64" fill="#6b6560">with reply handling</text>
+  <text x="80" y="272" font-family="Inter,system-ui,-apple-system,'Segoe UI',sans-serif" font-size="22" fill="#6b6560">Book online. Confirm and remind by text. Customers reply C or R.</text>
+  <rect x="80.5" y="304.5" width="210" height="36" rx="18" fill="#fdfcfc" stroke="#dedcdc"/>
+  <text x="185.500" y="327" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="14" fill="#6b6560">Built on the Sent API</text>
+  <rect x="870.5" y="60.5" width="330" height="72" rx="10" fill="#ffffff" stroke="#dedcdc"/>
+  <circle cx="900" cy="96.500" r="6" fill="#1a7f37"/>
+  <text x="920" y="103" font-family="Inter,system-ui,-apple-system,'Segoe UI',sans-serif" font-size="20" fill="#130f0c">Booking confirmed</text>
+  <rect x="870.5" y="158.500" width="330" height="72" rx="10" fill="#ffffff" stroke="#dedcdc"/>
+  <circle cx="900" cy="194.500" r="6" fill="#6b6560"/>
+  <text x="920" y="201" font-family="Inter,system-ui,-apple-system,'Segoe UI',sans-serif" font-size="20" fill="#130f0c">Reminder: tomorrow 11:00 AM</text>
+  <rect x="1126" y="256" width="74" height="60" rx="14" fill="#266df0"/>
+  <text x="1163" y="295" text-anchor="middle" font-family="Inter,system-ui,-apple-system,'Segoe UI',sans-serif" font-size="26" font-weight="600" fill="#fdfcfc">C</text>
+</svg>
