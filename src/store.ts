@@ -13,6 +13,8 @@ export interface Appointment {
   status: AppointmentStatus;
   reminderMessageId: string | null;
   reminderStatus: string | null;
+  lastReply: string | null;
+  lastReplyAt: string | null;
   createdAt: string;
 }
 
@@ -24,6 +26,8 @@ interface Row {
   status: AppointmentStatus;
   reminder_message_id: string | null;
   reminder_status: string | null;
+  last_reply: string | null;
+  last_reply_at: string | null;
   created_at: string;
 }
 
@@ -35,6 +39,8 @@ const toAppointment = (row: Row): Appointment => ({
   status: row.status,
   reminderMessageId: row.reminder_message_id,
   reminderStatus: row.reminder_status,
+  lastReply: row.last_reply,
+  lastReplyAt: row.last_reply_at,
   createdAt: row.created_at,
 });
 
@@ -55,12 +61,20 @@ export class Store {
         status TEXT NOT NULL,
         reminder_message_id TEXT,
         reminder_status TEXT,
+        last_reply TEXT,
+        last_reply_at TEXT,
         created_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS appointments_phone ON appointments (phone);
       CREATE INDEX IF NOT EXISTS appointments_reminder ON appointments (reminder_message_id);
       CREATE TABLE IF NOT EXISTS seen_events (id TEXT PRIMARY KEY);
     `);
+    const columns = (this.db.prepare('PRAGMA table_info(appointments)').all() as unknown as { name: string }[]).map((c) => c.name);
+    for (const column of ['last_reply', 'last_reply_at']) {
+      if (!columns.includes(column)) {
+        this.db.exec(`ALTER TABLE appointments ADD COLUMN ${column} TEXT`);
+      }
+    }
   }
 
   create(input: { name: string; phone: string; startsAt: string }): Appointment {
@@ -70,12 +84,12 @@ export class Store {
       status: 'scheduled',
       reminderMessageId: null,
       reminderStatus: null,
+      lastReply: null,
+      lastReplyAt: null,
       createdAt: new Date().toISOString(),
     };
     this.db
-      .prepare(
-        'INSERT INTO appointments (id, name, phone, starts_at, status, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-      )
+      .prepare('INSERT INTO appointments (id, name, phone, starts_at, status, created_at) VALUES (?, ?, ?, ?, ?, ?)')
       .run(appointment.id, appointment.name, appointment.phone, appointment.startsAt, appointment.status, appointment.createdAt);
     return appointment;
   }
@@ -94,8 +108,7 @@ export class Store {
     const rows = this.db
       .prepare("SELECT * FROM appointments WHERE phone = ? AND status != 'cancelled' ORDER BY starts_at ASC")
       .all(phone) as unknown as Row[];
-    const upcoming = rows.map(toAppointment).find((a) => new Date(a.startsAt) > now);
-    return upcoming;
+    return rows.map(toAppointment).find((a) => new Date(a.startsAt) > now);
   }
 
   setReminder(id: string, messageId: string): void {
@@ -108,6 +121,10 @@ export class Store {
 
   setStatus(id: string, status: AppointmentStatus): void {
     this.db.prepare('UPDATE appointments SET status = ? WHERE id = ?').run(status, id);
+  }
+
+  setLastReply(id: string, text: string, at: Date): void {
+    this.db.prepare('UPDATE appointments SET last_reply = ?, last_reply_at = ? WHERE id = ?').run(text.slice(0, 200), at.toISOString(), id);
   }
 
   setReminderStatus(messageId: string, status: string): void {

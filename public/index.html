@@ -4,51 +4,87 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Appointment reminders</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232563eb'/%3E%3Cpath d='M9 17l5 5 9-11' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div id="banner" hidden></div>
   <div id="toast" role="alert" hidden></div>
-  <div class="layout">
-    <main>
-      <header>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>
+      </span>
+      <div>
         <h1>Appointment reminders</h1>
-        <p>Book an appointment. Sent schedules the reminder, and a reply of <b>C</b> or <b>R</b> updates the status.</p>
-      </header>
+        <p>Reminders out, replies in, statuses updated.</p>
+      </div>
+    </div>
+    <span id="mode" class="mode" hidden></span>
+  </header>
 
-      <form id="booking">
-        <label>Name <input name="name" required autocomplete="off"></label>
-        <label>Phone <input name="phone" placeholder="+14155551234" required autocomplete="off"></label>
-        <label>Starts at <input name="startsAt" type="datetime-local" required></label>
-        <button type="submit">Book</button>
-        
-      </form>
+  <div class="shell" id="shell">
+    <main>
+      <section class="stats" aria-label="Summary">
+        <div class="stat"><span id="stat-upcoming">0</span><label>Upcoming</label></div>
+        <div class="stat good"><span id="stat-confirmed">0</span><label>Confirmed</label></div>
+        <div class="stat warn"><span id="stat-reschedule">0</span><label>Need a new time</label></div>
+        <div class="stat muted"><span id="stat-cancelled">0</span><label>Cancelled</label></div>
+      </section>
 
-      <table>
-        <thead>
-          <tr><th>Name</th><th>Phone</th><th>Starts</th><th>Status</th><th>Reminder</th><th></th></tr>
-        </thead>
-        <tbody id="rows"></tbody>
-      </table>
-      <p id="empty" hidden>No appointments yet.</p>
+      <section class="card">
+        <h2>Book an appointment</h2>
+        <form id="booking">
+          <label>Customer name
+            <input name="name" placeholder="Ada Lovelace" required autocomplete="off">
+          </label>
+          <label>Mobile number
+            <input name="phone" placeholder="+14155551234" required autocomplete="off" inputmode="tel">
+            <small>International format with country code</small>
+          </label>
+          <label>Appointment
+            <input name="startsAt" type="datetime-local" required>
+            <small id="lead-hint"></small>
+          </label>
+          <button type="submit" class="primary">Book and schedule reminder</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Appointments</h2>
+        <ul id="list" class="list"></ul>
+        <div id="empty" class="empty" hidden>
+          <strong>No appointments yet</strong>
+          <span>Book one above. The reminder is scheduled with Sent automatically.</span>
+        </div>
+      </section>
     </main>
 
     <aside id="phone" hidden>
-      <h2>Customer phone</h2>
-      <div id="thread"></div>
-      <form id="reply">
-        <input name="text" placeholder="Type a reply" autocomplete="off" required>
-        <button type="submit">Send</button>
-      </form>
-      <div class="quick">
-        <button type="button" data-text="C">C</button>
-        <button type="button" data-text="R">R</button>
-        <button type="button" data-text="STOP">STOP</button>
-        <button type="button" data-text="hello">hello</button>
+      <div class="device">
+        <div class="device-bar">
+          <span class="avatar" id="phone-avatar">?</span>
+          <div>
+            <strong id="phone-name">Customer phone</strong>
+            <small id="phone-number">Book an appointment to start</small>
+          </div>
+        </div>
+        <div id="thread" class="thread"></div>
+        <div class="quick">
+          <button type="button" data-text="C">C</button>
+          <button type="button" data-text="R">R</button>
+          <button type="button" data-text="STOP">STOP</button>
+          <button type="button" data-text="hello">hello</button>
+        </div>
+        <form id="reply">
+          <input name="text" placeholder="Text message" autocomplete="off" required>
+          <button type="submit" aria-label="Send">&uarr;</button>
+        </form>
       </div>
-      <p id="phone-hint"></p>
+      <p class="aside-note">Simulated customer. Replies go through the same code a real Sent webhook uses.</p>
     </aside>
   </div>
+
   <script src="app.js"></script>
 </body>
 </html>

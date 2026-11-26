@@ -91,6 +91,7 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
 
       const appointment = store.findUpcomingByPhone(payload.inbound_number, now());
       if (!appointment) return;
+      store.setLastReply(appointment.id, payload.text ?? '', now());
 
       const { date, time } = format(appointment.startsAt);
       if (intent === 'confirm') {

@@ -58,7 +58,7 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
   });
 
   app.get('/api/config', (_req, res) => {
-    res.json({ demo: demo !== undefined, sandbox: config.sandbox });
+    res.json({ demo: demo !== undefined, sandbox: config.sandbox, reminderLeadMinutes: config.reminderLeadMinutes });
   });
 
   if (demo) {
