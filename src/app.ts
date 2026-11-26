@@ -58,7 +58,15 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
   });
 
   app.get('/api/config', (_req, res) => {
-    res.json({ demo: demo !== undefined, sandbox: config.sandbox, reminderLeadMinutes: config.reminderLeadMinutes });
+    res.json({
+      demo: demo !== undefined,
+      sandbox: config.sandbox,
+      reminderLeadMinutes: config.reminderLeadMinutes,
+      businessName: config.businessName,
+      serviceName: config.serviceName,
+      timezone: config.timezone,
+      confirmationAlerts: config.confirmationTemplateName !== '',
+    });
   });
 
   if (demo) {
@@ -85,7 +93,8 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
     });
   }
 
-  app.get('/api/appointments', (_req, res) => {
+  app.get('/api/appointments', async (_req, res) => {
+    await reminders.syncStatuses();
     res.json(store.list());
   });
 

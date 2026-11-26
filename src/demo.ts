@@ -21,7 +21,9 @@ export class DemoMessenger implements Messenger {
     const p = request.template?.parameters;
     const body =
       request.text ??
-      `Hello ${p?.customer_name}, this is a reminder about your upcoming appointment with ${p?.business_name} on ${p?.appointment_date} at ${p?.appointment_time}. Reply C to confirm or R to reschedule.`;
+      (p?.service_name
+        ? `Hello ${p.customer_name},\n\nThank you for booking with ${p.business_name}.\n\nYour appointment for ${p.service_name} on ${p.appointment_date} at ${p.appointment_time} is confirmed.`
+        : `Hello ${p?.customer_name}, this is a reminder about your upcoming appointment with ${p?.business_name} on ${p?.appointment_date} at ${p?.appointment_time}. Reply C to confirm or R to reschedule.`);
     const scheduled = request.scheduledAt !== undefined;
     const message: DemoMessage = {
       id: randomUUID(),

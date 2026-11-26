@@ -1,8 +1,11 @@
 import type { Config } from './config.js';
 import type { Messenger } from './messenger.js';
+import { explainSentError } from './errors.js';
 import { classifyReply } from './replies.js';
 import type { Appointment, Store } from './store.js';
 
+const FINAL = new Set(['delivered', 'read', 'failed', 'blocked', 'cancelled']);
+const lastSync = new Map<string, number>();
 const MIN_SCHEDULE_AHEAD_MS = 2 * 60_000;
 const MAX_SCHEDULE_AHEAD_MS = 30 * 24 * 60 * 60_000;
 
@@ -14,8 +17,11 @@ export interface InboundPayload {
   text?: string | null;
 }
 
+export type BookingResult = Appointment & { confirmationError?: string };
+
 export interface Reminders {
-  book(input: { name: string; phone: string; startsAt: string }): Promise<Appointment>;
+  book(input: { name: string; phone: string; startsAt: string }): Promise<BookingResult>;
+  syncStatuses(): Promise<void>;
   cancel(id: string): Promise<Appointment | undefined>;
   handleInbound(payload: InboundPayload): Promise<void>;
   handleStatus(event: string, payload: { message_id?: string }): void;
@@ -51,18 +57,14 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
       const appointment = store.create({ name, phone, startsAt });
       const { date, time } = format(startsAt);
       const scheduleLater = sendAt - current >= MIN_SCHEDULE_AHEAD_MS;
+      const baseParameters = { customer_name: name, business_name: config.businessName, appointment_date: date, appointment_time: time };
 
       try {
         const messageId = await messenger.send({
           to: phone,
           template: {
             name: config.templateName,
-            parameters: {
-              customer_name: name,
-              business_name: config.businessName,
-              appointment_date: date,
-              appointment_time: time,
-            },
+            parameters: baseParameters,
           },
           ...(scheduleLater && { scheduledAt: new Date(sendAt) }),
           idempotencyKey: `reminder-${appointment.id}`,
@@ -72,7 +74,46 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
         store.delete(appointment.id);
         throw err;
       }
-      return store.get(appointment.id)!;
+
+      let confirmationError: string | undefined;
+      if (config.confirmationTemplateName) {
+        try {
+          const messageId = await messenger.send({
+            to: phone,
+            template: {
+              name: config.confirmationTemplateName,
+              parameters: { ...baseParameters, service_name: config.serviceName },
+            },
+            idempotencyKey: `confirmation-${appointment.id}`,
+          });
+          store.setConfirmation(appointment.id, messageId);
+        } catch (err) {
+          confirmationError = explainSentError(err)?.message ?? 'The booking alert could not be sent.';
+          console.error(`Booking alert for ${appointment.id} failed: ${confirmationError}`);
+        }
+      }
+      return { ...store.get(appointment.id)!, ...(confirmationError && { confirmationError }) };
+    },
+
+    async syncStatuses() {
+      const lookup = messenger.status?.bind(messenger);
+      if (!lookup || config.sandbox) return;
+      const at = Date.now();
+      const pending: [string, string | null][] = [];
+      for (const a of store.list()) {
+        if (a.status === 'cancelled') continue;
+        pending.push([a.reminderMessageId ?? '', a.reminderStatus], [a.confirmationMessageId ?? '', a.confirmationStatus]);
+      }
+      await Promise.allSettled(
+        pending
+          .filter(([id, status]) => id && !FINAL.has(status ?? ''))
+          .filter(([id, status]) => at - (lastSync.get(id) ?? 0) > (status === 'scheduled' ? 60_000 : 4_000))
+          .map(async ([id]) => {
+            lastSync.set(id, at);
+            const status = await lookup(id);
+            if (status) store.setMessageStatus(id, status);
+          }),
+      );
     },
 
     async cancel(id) {
@@ -107,7 +148,7 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
 
     handleStatus(event, payload) {
       if (payload.message_id) {
-        store.setReminderStatus(payload.message_id, event.replace(/^message\./, ''));
+        store.setMessageStatus(payload.message_id, event.replace(/^message\./, ''));
       }
     },
   };

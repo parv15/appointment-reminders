@@ -6,6 +6,8 @@ const toast = $('toast');
 const submit = form.querySelector('button[type="submit"]');
 
 let demo = false;
+let config = {};
+let bookedId = null;
 let leadMinutes = 1440;
 let selectedPhone = null;
 let toastTimer;
@@ -169,6 +171,7 @@ async function refresh() {
       selectedPhone = appointments.at(-1).phone;
     }
     renderStats(appointments);
+    renderBooked(appointments);
     renderList(appointments);
     if (demo) renderThread(appointments, await api('/api/demo/messages'));
   } catch (err) {
@@ -184,6 +187,64 @@ async function sendReply(text) {
   if (await attempt(() => api('/api/demo/replies', { method: 'POST', body: JSON.stringify({ phone: selectedPhone, text }) }))) {
     refresh();
   }
+}
+
+const format = (iso, options) => new Intl.DateTimeFormat('en-US', { timeZone: config.timezone, ...options }).format(new Date(iso));
+const clean = (text) => text.replace(/[\u202f\u00a0]/g, ' ');
+
+function alertPreview(a) {
+  return [
+    `Hello ${a.name},`,
+    `Thank you for booking with ${config.businessName}.`,
+    `Your appointment for ${config.serviceName} on ${clean(format(a.startsAt, { dateStyle: 'medium' }))} at ${clean(format(a.startsAt, { timeStyle: 'short' }))} is confirmed.`,
+  ].join('\n\n');
+}
+
+function setSteps(step) {
+  for (const li of $('steps').children) {
+    const n = Number(li.dataset.step);
+    li.className = n < step ? 'done' : n === step ? 'current' : '';
+  }
+}
+
+function renderBooked(appointments) {
+  const a = appointments.find((x) => x.id === bookedId);
+  $('booked').hidden = !a;
+  $('form-card').hidden = Boolean(a);
+  if (!a) {
+    setSteps(1);
+    return;
+  }
+
+  const status = a.confirmationStatus;
+  const failed = status === 'failed' || status === 'blocked';
+  const delivered = status === 'delivered' || status === 'read';
+  const rank = delivered ? 3 : status === 'sent' ? 2 : 1;
+  setSteps(delivered ? 4 : 2);
+
+  $('booked-sub').textContent = !config.confirmationAlerts
+    ? 'Reminder scheduled.'
+    : failed
+      ? `The booking alert to ${a.phone} could not be delivered.`
+      : delivered
+        ? `Booking alert delivered to ${a.phone}.`
+        : `A booking alert is on its way to ${a.phone}.`;
+  $('d-name').textContent = a.name;
+  $('d-phone').textContent = a.phone;
+  $('d-when').textContent = new Date(a.startsAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  const sendAt = new Date(new Date(a.startsAt).getTime() - config.reminderLeadMinutes * 60_000);
+  $('d-reminder').textContent = sendAt.getTime() - Date.now() < 120_000 ? 'Sent right away' : sendAt.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+
+  const hasAlert = config.confirmationAlerts && a.confirmationMessageId;
+  document.querySelector('.alert-box').hidden = !hasAlert;
+  $('alert-text').textContent = alertPreview(a);
+  const chip = $('alert-chip');
+  chip.className = `pill ${status ?? 'queued'}`;
+  chip.textContent = label(status ?? 'queued');
+  [...$('track').children].forEach((li, i) => li.classList.toggle('on', !failed && i < rank));
+  const error = $('alert-error');
+  error.hidden = !failed;
+  error.textContent = failed ? `Sent could not deliver this alert (${status}). Check the number and your Sent sender setup.` : '';
 }
 
 function setDefaultStart() {
@@ -222,21 +283,29 @@ form.addEventListener('submit', async (event) => {
 
   submit.disabled = true;
   submit.textContent = 'Booking...';
-  const ok = await attempt(() =>
-    api('/api/appointments', {
+  let result = null;
+  await attempt(async () => {
+    result = await api('/api/appointments', {
       method: 'POST',
       body: JSON.stringify({ name: data.get('name'), phone, startsAt: startsAt.toISOString() }),
-    }),
-  );
+    });
+  });
   submit.disabled = false;
   submit.textContent = 'Book and schedule reminder';
 
-  if (ok) {
+  if (result) {
+    if (result.confirmationError) showError(`Booked, but the alert failed: ${result.confirmationError}`);
     selectedPhone = phone;
+    bookedId = result.id;
     form.reset();
     setDefaultStart();
     refresh();
   }
+});
+
+$('book-another').addEventListener('click', () => {
+  bookedId = null;
+  refresh();
 });
 
 $('reply').addEventListener('submit', (event) => {
@@ -252,7 +321,7 @@ for (const button of document.querySelectorAll('.quick button')) {
 
 async function init() {
   try {
-    const config = await api('/api/config');
+    config = await api('/api/config');
     demo = config.demo;
     leadMinutes = config.reminderLeadMinutes;
     const mode = $('mode');

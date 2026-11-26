@@ -3,7 +3,9 @@ export interface Config {
   demo: boolean;
   webhookSecret: string;
   templateName: string;
+  confirmationTemplateName: string;
   businessName: string;
+  serviceName: string;
   reminderLeadMinutes: number;
   timezone: string;
   sandbox: boolean;
@@ -65,7 +67,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     demo,
     webhookSecret,
     templateName: env.SENT_TEMPLATE_NAME ?? 'appointment_reminder_reply',
+    confirmationTemplateName: env.SENT_CONFIRMATION_TEMPLATE ?? 'sent_Appointment_Confirmation_1',
     businessName,
+    serviceName: env.SERVICE_NAME?.trim() || 'Appointment',
     reminderLeadMinutes,
     timezone,
     sandbox: env.SENT_SANDBOX === 'true',

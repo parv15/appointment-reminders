@@ -32,7 +32,45 @@
         <div class="stat muted"><span id="stat-cancelled">0</span><label>Cancelled</label></div>
       </section>
 
-      <section class="card">
+      <ol class="steps" id="steps" aria-label="Progress">
+        <li class="current" data-step="1"><span>1</span>Appointment</li>
+        <li data-step="2"><span>2</span>Booked</li>
+        <li data-step="3"><span>3</span>Alert delivered</li>
+      </ol>
+
+      <section class="card" id="booked" hidden>
+        <div class="booked-head">
+          <span class="check" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>
+          </span>
+          <div>
+            <h2>Appointment booked</h2>
+            <p id="booked-sub"></p>
+          </div>
+        </div>
+        <dl class="details">
+          <div><dt>Customer</dt><dd id="d-name"></dd></div>
+          <div><dt>Mobile</dt><dd id="d-phone"></dd></div>
+          <div><dt>When</dt><dd id="d-when"></dd></div>
+          <div><dt>Reminder</dt><dd id="d-reminder"></dd></div>
+        </dl>
+        <div class="alert-box">
+          <div class="alert-title">
+            <strong>Alert to customer</strong>
+            <span id="alert-chip" class="pill queued">queued</span>
+          </div>
+          <div class="sms" id="alert-text"></div>
+          <ol class="track" id="track">
+            <li data-s="queued">Queued</li>
+            <li data-s="sent">Sent</li>
+            <li data-s="delivered">Delivered</li>
+          </ol>
+          <p id="alert-error" class="alert-error" hidden></p>
+        </div>
+        <button type="button" class="primary" id="book-another">Book another appointment</button>
+      </section>
+
+      <section class="card" id="form-card">
         <h2>Book an appointment</h2>
         <form id="booking">
           <label>Customer name

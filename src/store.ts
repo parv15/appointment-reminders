@@ -15,6 +15,8 @@ export interface Appointment {
   reminderStatus: string | null;
   lastReply: string | null;
   lastReplyAt: string | null;
+  confirmationMessageId: string | null;
+  confirmationStatus: string | null;
   createdAt: string;
 }
 
@@ -28,6 +30,8 @@ interface Row {
   reminder_status: string | null;
   last_reply: string | null;
   last_reply_at: string | null;
+  confirmation_message_id: string | null;
+  confirmation_status: string | null;
   created_at: string;
 }
 
@@ -41,6 +45,8 @@ const toAppointment = (row: Row): Appointment => ({
   reminderStatus: row.reminder_status,
   lastReply: row.last_reply,
   lastReplyAt: row.last_reply_at,
+  confirmationMessageId: row.confirmation_message_id,
+  confirmationStatus: row.confirmation_status,
   createdAt: row.created_at,
 });
 
@@ -63,6 +69,8 @@ export class Store {
         reminder_status TEXT,
         last_reply TEXT,
         last_reply_at TEXT,
+        confirmation_message_id TEXT,
+        confirmation_status TEXT,
         created_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS appointments_phone ON appointments (phone);
@@ -70,7 +78,7 @@ export class Store {
       CREATE TABLE IF NOT EXISTS seen_events (id TEXT PRIMARY KEY);
     `);
     const columns = (this.db.prepare('PRAGMA table_info(appointments)').all() as unknown as { name: string }[]).map((c) => c.name);
-    for (const column of ['last_reply', 'last_reply_at']) {
+    for (const column of ['last_reply', 'last_reply_at', 'confirmation_message_id', 'confirmation_status']) {
       if (!columns.includes(column)) {
         this.db.exec(`ALTER TABLE appointments ADD COLUMN ${column} TEXT`);
       }
@@ -86,6 +94,8 @@ export class Store {
       reminderStatus: null,
       lastReply: null,
       lastReplyAt: null,
+      confirmationMessageId: null,
+      confirmationStatus: null,
       createdAt: new Date().toISOString(),
     };
     this.db
@@ -127,8 +137,13 @@ export class Store {
     this.db.prepare('UPDATE appointments SET last_reply = ?, last_reply_at = ? WHERE id = ?').run(text.slice(0, 200), at.toISOString(), id);
   }
 
-  setReminderStatus(messageId: string, status: string): void {
+  setConfirmation(id: string, messageId: string): void {
+    this.db.prepare("UPDATE appointments SET confirmation_message_id = ?, confirmation_status = 'queued' WHERE id = ?").run(messageId, id);
+  }
+
+  setMessageStatus(messageId: string, status: string): void {
     this.db.prepare('UPDATE appointments SET reminder_status = ? WHERE reminder_message_id = ?').run(status, messageId);
+    this.db.prepare('UPDATE appointments SET confirmation_status = ? WHERE confirmation_message_id = ?').run(status, messageId);
   }
 
   markEventSeen(eventId: string): boolean {

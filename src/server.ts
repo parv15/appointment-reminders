@@ -24,20 +24,24 @@ try {
 
 const store = new Store(config.databasePath);
 const demo = config.demo
-  ? new DemoMessenger((messageId, status) => store.setReminderStatus(messageId, status))
+  ? new DemoMessenger((messageId, status) => store.setMessageStatus(messageId, status))
   : undefined;
 
 let messenger;
 if (demo) {
   messenger = demo;
 } else {
-  const sent = createSentMessenger({ sandbox: config.sandbox, templateName: config.templateName });
+  const sent = createSentMessenger({
+    sandbox: config.sandbox,
+    templateName: config.templateName,
+    confirmationTemplateName: config.confirmationTemplateName,
+  });
   try {
     for (const warning of await sent.verify()) {
       console.warn(`Warning: ${warning}`);
     }
     if (!config.webhookSecret) {
-      console.warn('Warning: SENT_DM_WEBHOOK_SECRET is not set. Reminders can be sent, but delivery updates and replies are ignored until a webhook is registered (README step 3).');
+      console.warn('Warning: SENT_DM_WEBHOOK_SECRET is not set. Delivery status is still tracked, but customer replies (C or R) are ignored until a webhook is registered (README step 3).');
     }
   } catch (err) {
     const explained = explainSentError(err);

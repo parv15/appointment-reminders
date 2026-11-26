@@ -38,7 +38,7 @@ Demo data lives in memory and is gone on restart.
 
 ## How it works
 
-1. **Book.** `POST /api/appointments` stores the appointment and calls Sent to send the template, with `scheduled_at` set to the appointment time minus `REMINDER_LEAD_MINUTES`. Sent returns a message id, which is saved on the appointment.
+1. **Book.** `POST /api/appointments` stores the appointment, sends the customer a booking alert right away, and calls Sent to schedule the reminder template, with `scheduled_at` set to the appointment time minus `REMINDER_LEAD_MINUTES`. Sent returns a message id, which is saved on the appointment.
 2. **Remind.** Sent holds the message and releases it at that time on the channel it picks for the contact (SMS, WhatsApp or RCS).
 3. **Track.** Sent posts `message.*` events to `/webhooks/sent`. Each one is signature-checked, then the reminder status updates (`delivered`, `failed`, `blocked`).
 4. **Reply.** A customer reply arrives as `message.received`. `C` marks the appointment `confirmed`, `R` marks it `reschedule_requested`, other text gets a help message. The answer is sent back on the same channel.
@@ -113,8 +113,10 @@ cp .env.example .env
 | --- | --- | --- |
 | `SENT_DM_API_KEY` | required | API key from the Sent dashboard |
 | `BUSINESS_NAME` | required | Business name shown in the reminder, for example `Acme Dental` |
-| `SENT_DM_WEBHOOK_SECRET` | empty | Signing secret from step 3. Without it, replies and delivery updates are ignored |
+| `SENT_DM_WEBHOOK_SECRET` | empty | Signing secret from step 3. Without it, customer replies are ignored. Delivery status is still tracked by polling Sent |
 | `SENT_TEMPLATE_NAME` | `appointment_reminder_reply` | Template used for reminders |
+| `SENT_CONFIRMATION_TEMPLATE` | `sent_Appointment_Confirmation_1` | Template for the alert sent the moment an appointment is booked. Set empty to turn the alert off |
+| `SERVICE_NAME` | `Appointment` | Service named in the booking alert, for example `Dental checkup` |
 | `REMINDER_LEAD_MINUTES` | `1440` | How long before the appointment the reminder goes out |
 | `BUSINESS_TIMEZONE` | `UTC` | IANA timezone used to format the date and time in messages |
 | `SENT_SANDBOX` | `false` | Validate requests without sending anything |
