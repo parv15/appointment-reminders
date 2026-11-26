@@ -218,7 +218,7 @@ h2 { font-size: 17px; font-weight: 500; letter-spacing: -0.015em; }
 .checks li.bad .box { border-color: var(--bad); background: var(--bad); }
 
 /* Dithered customer sphere */
-.sphere { position: relative; display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; overflow: hidden; background: radial-gradient(circle at 32% 28%, #7aa2ff, #266df0 55%, #1a47b5); }
+.sphere { flex: none; aspect-ratio: 1; position: relative; display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; overflow: hidden; background: radial-gradient(circle at 32% 28%, #7aa2ff, #266df0 55%, #1a47b5); }
 .sphere::after { content: ""; position: absolute; inset: 0; background-image: radial-gradient(#fff 0.9px, transparent 1.2px); background-size: 4px 4px; opacity: 0.35; mix-blend-mode: soft-light; }
 
 /* Picker */
