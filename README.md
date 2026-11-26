@@ -2,7 +2,7 @@
 
 # Appointment reminders with reply handling
 
-A booking portal that texts customers a confirmation and a reminder, and lets them reply C or R. Built on [Sent](https://sent.dm).
+Appointment booking with text message confirmations and reminders, where customers reply to confirm or reschedule. Built with the [Sent](https://sent.dm) API.
 
 [![CI](https://github.com/parv15/sent-appointment-reminders/actions/workflows/ci.yml/badge.svg)](https://github.com/parv15/sent-appointment-reminders/actions/workflows/ci.yml)
 [![Node](https://img.shields.io/badge/node-%E2%89%A522.13-339933?logo=node.js&logoColor=white)](https://nodejs.org)
