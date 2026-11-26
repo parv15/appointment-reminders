@@ -3,7 +3,7 @@ const MIN_REMINDER_GAP_MS = 3 * 60_000;
 function createPicker(root, { config, excludeId = null, withServices = false, onChange = () => {}, onFirstSlot = () => {} }) {
   const state = { service: config.services[0], date: null, slot: null, lead: null };
   const slotTime = formatter(config.timezone, { timeStyle: 'short' });
-  const dayLabel = formatter(config.timezone, { weekday: 'short', day: 'numeric', month: 'short' });
+  const dayLabel = formatter('UTC', { weekday: 'short', day: 'numeric', month: 'short' });
   const reminderAt = formatter(config.timezone, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   const feasible = (minutes) => state.slot && new Date(state.slot) - minutes * 60_000 - Date.now() >= MIN_REMINDER_GAP_MS;
@@ -86,17 +86,7 @@ function createPicker(root, { config, excludeId = null, withServices = false, on
   }
 
   function days() {
-    const list = [];
-    const seen = new Set();
-    for (let i = 0; i <= config.maxAdvanceDays + 1 && list.length <= config.maxAdvanceDays; i++) {
-      const instant = new Date(Date.now() + i * 86_400_000);
-      const key = new Intl.DateTimeFormat('en-CA', { timeZone: config.timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(instant);
-      if (!seen.has(key)) {
-        seen.add(key);
-        list.push({ key, instant });
-      }
-    }
-    return list;
+    return config.days.map((key) => ({ key, instant: new Date(`${key}T12:00:00Z`) }));
   }
 
   function renderDays() {

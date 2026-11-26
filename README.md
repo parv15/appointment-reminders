@@ -284,7 +284,17 @@ try {
 | The webhook secret is missing | The webhook answers 503 and replies are ignored. Texts still go out and their status is polled. |
 | The same webhook arrives twice | The event id is stored, so the event is processed once. |
 | A customer replies after the appointment | The reply is ignored, because replies only apply to upcoming appointments. |
-| Two people pick the same slot | The second booking is refused and the portal reloads the slots. |
+| Two people pick the same slot | The second booking is refused and the portal reloads the slots. The database also allows only one active booking per slot, so two requests at the same instant cannot both win. |
+| The same person submits the form twice | The second request returns the first booking and sends nothing more. |
+| Saving a booking fails after Sent accepted the reminder | The reminder is cancelled again and the booking is removed, so nobody receives a reminder for a booking that does not exist. |
+| Processing a webhook fails | The event is released and the app answers 500, so Sent delivers it again. An event that finished is never processed twice. |
+| The reply text fails to send | The booking still updates, the error is logged and the webhook is acknowledged. |
+| A customer replies from a number without a plus sign, or on an unknown channel | The number is normalised and the reply goes out on the default channel. |
+| An appointment is cancelled, rescheduled or answered after the booking page loaded | The page keeps checking and shows the new state. It says plainly when the appointment was cancelled. |
+| The reminder to cancel was already sent or no longer exists | Cancelling still succeeds, because there is nothing left to cancel at Sent. |
+| A time that does not exist or occurs twice because of daylight saving | The slot list skips it, so every offered time is a real local time exactly once. |
+| Staff reschedule to the time the booking already has | Nothing changes and no new texts are sent. |
+| An appointment time has passed | It moves to the Past tab and stops counting as upcoming or as needing attention. |
 | Cancelling the old reminder fails during a reschedule | The new reminder is cancelled again and nothing changes. |
 
 ## Security design
@@ -293,7 +303,7 @@ Webhook signatures are verified in constant time. Requests older than five minut
 
 The dashboard and every admin API sit behind a sign-in page when `ADMIN_PASSWORD` is set. A correct password sets an `HttpOnly` session cookie with `SameSite=Lax` that is valid for 12 hours, and the cookie is marked `Secure` when the request arrives over HTTPS. After five wrong passwords from one address the login endpoint refuses further attempts for five minutes. The cookie holds a signed expiry time and no personal data.
 
-The public booking endpoints only return the booking you made, found by its random id, and they never list other bookings. Phone numbers are validated as E.164 and names are validated against the pattern the Sent templates accept before anything is sent.
+The public booking endpoints only return the booking you made, found by its random id, and they never list other bookings. One connection can make 10 booking requests per hour and one phone number can hold 3 upcoming appointments, which stops the form from being used to send texts to strangers. Phone numbers are validated as E.164 and names are validated against the pattern the Sent templates accept before anything is sent. A number typed with a plus sign or a leading 00 is used as written, and otherwise the selected country code is added.
 
 Secrets come only from environment variables, and `.env`, the database and build output are in `.gitignore`. The app has no analytics and loads no third-party script. The only font is bundled together with its licence.
 
@@ -318,6 +328,8 @@ All settings are environment variables, usually kept in `.env`. [`.env.example`]
 | `BOOKING_END_HOUR` | `17` | End of the last slot. |
 | `SLOT_MINUTES` | `30` | Slot length: 10, 15, 20, 30, 45 or 60. |
 | `DEFAULT_COUNTRY_CODE` | `+1` | Country code preselected on the portal. |
+| `BOOKINGS_PER_HOUR_PER_IP` | `10` | How many booking requests one address may make per hour. |
+| `TRUST_PROXY` | empty | Set to the number of proxies in front of the app, for example `1`, so that rate limits use the real visitor address. Leave it empty when the app is exposed directly. |
 | `SENT_SANDBOX` | `false` | Validates requests without sending anything. |
 | `PORT` | `3000` | HTTP port. |
 | `DATABASE_PATH` | `./data/appointments.db` | SQLite file. |
@@ -328,7 +340,7 @@ These endpoints are open and are used by the booking portal:
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `GET` | `/api/config` | Business name, services, timezone, reminder options and mode. |
+| `GET` | `/api/config` | Business name, services, timezone, bookable days, reminder options and mode. |
 | `GET` | `/api/slots?date=YYYY-MM-DD` | Open slots for a day, as UTC instants. |
 | `POST` | `/api/bookings` | Books a slot. The body has `service`, `name`, `phone` in E.164 format and `startsAt` from `/api/slots`, plus an optional `reminderMinutes`. |
 | `GET` | `/api/bookings/:id` | One booking, with the delivery status and channel of its confirmation text. |

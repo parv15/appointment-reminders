@@ -2,21 +2,29 @@ import type { Config } from './config.js';
 import { explainSentError } from './errors.js';
 import { DELIVERY_CHANNELS, type Messenger } from './messenger.js';
 import { classifyReply } from './replies.js';
-import type { Appointment, Store } from './store.js';
+import { SlotTakenError, type Appointment, type Store } from './store.js';
 
 const MIN_SCHEDULE_AHEAD_MS = 2 * 60_000;
 const MAX_SCHEDULE_AHEAD_MS = 30 * 24 * 60 * 60_000;
 const FINAL_STATUSES = new Set(['delivered', 'read', 'failed', 'blocked', 'cancelled']);
+export const MAX_UPCOMING_PER_PHONE = 3;
 const POLL_INTERVAL_MS = 4_000;
 const SCHEDULED_POLL_INTERVAL_MS = 60_000;
 
-export class ValidationError extends Error {}
+export class ValidationError extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+  ) {
+    super(message);
+  }
+}
 
 class NoticeError extends Error {}
 
 export interface InboundPayload {
   inbound_number: string;
-  channel: string;
+  channel?: string | null;
   text?: string | null;
 }
 
@@ -60,7 +68,13 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
     return { customer_name: appointment.name, business_name: config.businessName, appointment_date: date, appointment_time: time };
   };
 
-  const reply = (to: string, channel: string, text: string) => messenger.send({ to, channel, text });
+  const reply = async (to: string, channel: string | undefined, text: string) => {
+    try {
+      await messenger.send({ to, channel, text });
+    } catch (err) {
+      console.error(`Reply to ${to} failed: ${explainSentError(err)?.message ?? (err instanceof Error ? err.message : err)}`);
+    }
+  };
 
   function chooseLead(startsAt: Date, requested?: number): number {
     const now = Date.now();
@@ -68,27 +82,27 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
 
     if (requested !== undefined) {
       if (!config.reminderOptions.includes(requested)) {
-        throw new ValidationError('Choose one of the offered reminder times.');
+        throw new ValidationError('Choose one of the offered reminder times.', 'slot_unavailable');
       }
       if (!feasible(requested)) {
-        throw new ValidationError('That reminder time has already passed. Choose a shorter reminder or a later appointment.');
+        throw new ValidationError('That reminder time has already passed. Choose a shorter reminder or a later appointment.', 'slot_unavailable');
       }
       return requested;
     }
 
     const lead = config.reminderOptions.find(feasible);
     if (lead === undefined) {
-      throw new ValidationError('That appointment is too soon for a reminder. Choose a later time.');
+      throw new ValidationError('That appointment is too soon for a reminder. Choose a later time.', 'slot_unavailable');
     }
     return lead;
   }
 
   function assertSchedulable(startsAt: Date, lead: number) {
     if (startsAt.getTime() <= Date.now()) {
-      throw new ValidationError('The appointment time must be in the future.');
+      throw new ValidationError('The appointment time must be in the future.', 'slot_unavailable');
     }
     if (startsAt.getTime() - lead * 60_000 - Date.now() > MAX_SCHEDULE_AHEAD_MS) {
-      throw new ValidationError('Reminders can be scheduled at most 30 days ahead. Pick a sooner appointment time.');
+      throw new ValidationError('Reminders can be scheduled at most 30 days ahead. Pick a sooner appointment time.', 'slot_unavailable');
     }
   }
 
@@ -121,14 +135,36 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
       const start = new Date(requested);
       const lead = chooseLead(start, reminderMinutes);
       assertSchedulable(start, lead);
-      if (store.takenStarts().has(start.toISOString())) {
-        throw new ValidationError('That time was just taken. Please pick another slot.');
+      const startsAt = start.toISOString();
+
+      const repeat = store.findActive(phone, startsAt);
+      if (repeat) return store.get(repeat.id)!;
+
+      if (store.takenStarts().has(startsAt)) {
+        throw new ValidationError('That time was just taken. Please pick another slot.', 'slot_unavailable');
+      }
+      if (store.countUpcomingByPhone(phone, new Date()) >= MAX_UPCOMING_PER_PHONE) {
+        throw new ValidationError(`This number already has ${MAX_UPCOMING_PER_PHONE} upcoming appointments. Cancel one before booking another.`);
       }
 
-      const appointment = store.create({ name, service, phone, startsAt: start.toISOString(), reminderLeadMinutes: lead });
+      let appointment: Appointment;
       try {
-        store.setReminder(appointment.id, await scheduleReminder(appointment, lead, `reminder-${appointment.id}`));
+        appointment = store.create({ name, service, phone, startsAt, reminderLeadMinutes: lead });
       } catch (err) {
+        throw err instanceof SlotTakenError ? new ValidationError('That time was just taken. Please pick another slot.', 'slot_unavailable') : err;
+      }
+
+      let reminderId: string;
+      try {
+        reminderId = await scheduleReminder(appointment, lead, `reminder-${appointment.id}`);
+      } catch (err) {
+        store.delete(appointment.id);
+        throw err;
+      }
+      try {
+        store.setReminder(appointment.id, reminderId);
+      } catch (err) {
+        await messenger.cancel(reminderId).catch(() => undefined);
         store.delete(appointment.id);
         throw err;
       }
@@ -151,7 +187,10 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
       const lead = chooseLead(start, reminderMinutes ?? current.reminderLeadMinutes ?? undefined);
       assertSchedulable(start, lead);
       if (store.takenStarts(id).has(start.toISOString())) {
-        throw new ValidationError('That time is taken. Pick another slot.');
+        throw new ValidationError('That time is taken. Pick another slot.', 'slot_unavailable');
+      }
+      if (start.toISOString() === current.startsAt && lead === current.reminderLeadMinutes && current.status !== 'reschedule_requested') {
+        return current;
       }
 
       const moved = { ...current, startsAt: start.toISOString() };
@@ -163,7 +202,12 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
         throw err;
       }
 
-      store.reschedule(id, moved.startsAt, lead);
+      try {
+        store.reschedule(id, moved.startsAt, lead);
+      } catch (err) {
+        await messenger.cancel(newReminderId).catch(() => undefined);
+        throw err instanceof SlotTakenError ? new ValidationError('That time is taken. Pick another slot.', 'slot_unavailable') : err;
+      }
       store.setReminder(id, newReminderId);
 
       let confirmationError: string | undefined;
@@ -179,7 +223,8 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
     async cancel(id) {
       const appointment = store.get(id);
       if (!appointment) return undefined;
-      if (appointment.status !== 'cancelled' && appointment.reminderMessageId) {
+      if (appointment.status === 'cancelled') return appointment;
+      if (appointment.reminderMessageId) {
         await messenger.cancel(appointment.reminderMessageId);
       }
       store.setStatus(id, 'cancelled');
@@ -187,22 +232,27 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
     },
 
     async handleInbound(payload) {
-      const intent = classifyReply(payload.text);
+      const text = typeof payload.text === 'string' ? payload.text : '';
+      const intent = classifyReply(text);
       if (intent === 'compliance') return;
 
-      const appointment = store.findUpcomingByPhone(payload.inbound_number, new Date());
+      const phone = payload.inbound_number.trim().startsWith('+') ? payload.inbound_number.trim() : `+${payload.inbound_number.trim()}`;
+      const channel = payload.channel?.toLowerCase();
+      const replyChannel = channel && DELIVERY_CHANNELS.has(channel) ? channel : undefined;
+
+      const appointment = store.findUpcomingByPhone(phone, new Date());
       if (!appointment) return;
-      store.setLastReply(appointment.id, payload.text ?? '', new Date());
+      store.setLastReply(appointment.id, text, new Date());
 
       const { date, time } = formatInZone(appointment.startsAt);
       if (intent === 'confirm') {
         store.setStatus(appointment.id, 'confirmed');
-        await reply(payload.inbound_number, payload.channel, `Thanks ${appointment.name}, your appointment on ${date} at ${time} is confirmed.`);
+        await reply(phone, replyChannel, `Thanks ${appointment.name}, your appointment on ${date} at ${time} is confirmed.`);
       } else if (intent === 'reschedule') {
         store.setStatus(appointment.id, 'reschedule_requested');
-        await reply(payload.inbound_number, payload.channel, `No problem ${appointment.name}. We will contact you shortly to find a new time.`);
+        await reply(phone, replyChannel, `No problem ${appointment.name}. We will contact you shortly to find a new time.`);
       } else {
-        await reply(payload.inbound_number, payload.channel, `Your appointment is on ${date} at ${time}. Reply C to confirm or R to reschedule.`);
+        await reply(phone, replyChannel, `Your appointment is on ${date} at ${time}. Reply C to confirm or R to reschedule.`);
       }
     },
 

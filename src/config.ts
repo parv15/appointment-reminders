@@ -16,7 +16,11 @@ export interface Config {
   timezone: string;
   sandbox: boolean;
   databasePath: string;
+  trustProxy: boolean | number | string;
+  bookingsPerHourPerIp: number;
 }
+
+const MAX_NAME_LENGTH = 40;
 
 export class ConfigError extends Error {
   constructor(readonly problems: string[]) {
@@ -78,10 +82,30 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     problems.push(`SLOT_MINUTES must be one of 10, 15, 20, 30, 45, 60, got "${env.SLOT_MINUTES}"`);
   }
 
-  const services = (env.SERVICES ?? 'Appointment').split(',').map((s) => s.trim()).filter(Boolean);
+  const services = [...new Set((env.SERVICES ?? 'Appointment').split(',').map((s) => s.trim()).filter(Boolean))];
   if (services.length === 0) {
     problems.push('SERVICES must list at least one service, for example "Dental checkup,Teeth cleaning"');
   }
+  const tooLong = services.filter((s) => s.length > MAX_NAME_LENGTH);
+  if (tooLong.length > 0) {
+    problems.push(`Each service name must be ${MAX_NAME_LENGTH} characters or fewer, so shorten: ${tooLong.join(', ')}`);
+  }
+  if (businessName.length > MAX_NAME_LENGTH) {
+    problems.push(`BUSINESS_NAME must be ${MAX_NAME_LENGTH} characters or fewer so that it fits the text templates`);
+  }
+
+  const defaultCountryCode = env.DEFAULT_COUNTRY_CODE?.trim() || '+1';
+  if (!/^\+[1-9]\d{0,2}$/.test(defaultCountryCode)) {
+    problems.push(`DEFAULT_COUNTRY_CODE must look like +1 or +91, got "${env.DEFAULT_COUNTRY_CODE}"`);
+  }
+
+  const bookingsPerHourPerIp = Number(env.BOOKINGS_PER_HOUR_PER_IP ?? 10);
+  if (!Number.isInteger(bookingsPerHourPerIp) || bookingsPerHourPerIp < 1) {
+    problems.push(`BOOKINGS_PER_HOUR_PER_IP must be a whole number of at least 1, got "${env.BOOKINGS_PER_HOUR_PER_IP}"`);
+  }
+
+  const proxy = env.TRUST_PROXY?.trim() ?? '';
+  const trustProxy: boolean | number | string = proxy === '' || proxy === 'false' ? false : proxy === 'true' ? true : /^\d+$/.test(proxy) ? Number(proxy) : proxy;
 
   if (problems.length > 0) {
     throw new ConfigError(problems);
@@ -95,7 +119,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     rescheduleTemplateName: env.SENT_RESCHEDULE_TEMPLATE ?? 'sent_Appointment_Reschedule_1',
     businessName,
     services,
-    defaultCountryCode: env.DEFAULT_COUNTRY_CODE ?? '+1',
+    defaultCountryCode,
     adminPassword: env.ADMIN_PASSWORD ?? '',
     slotRules: { timezone, startHour, endHour, slotMinutes, maxAdvanceDays: 14, minNoticeMinutes: Math.min(...reminderOptions) + 5 },
     reminderOptions,
@@ -103,5 +127,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     timezone,
     sandbox: env.SENT_SANDBOX === 'true',
     databasePath: env.DATABASE_PATH ?? './data/appointments.db',
+    trustProxy,
+    bookingsPerHourPerIp,
   };
 }

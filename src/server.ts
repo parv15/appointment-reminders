@@ -44,12 +44,19 @@ async function connectToSent(config: Config) {
   }
   if (!config.adminPassword) {
     console.warn('Warning: ADMIN_PASSWORD is not set, so /admin is open to anyone who can reach this server.');
+  } else if (config.adminPassword.length < 8) {
+    console.warn('Warning: ADMIN_PASSWORD is shorter than 8 characters. Use a longer password before you deploy.');
   }
   return sent;
 }
 
 const config = readConfig();
-const store = new Store(config.databasePath);
+let store: Store;
+try {
+  store = new Store(config.databasePath);
+} catch (err) {
+  fail(`Cannot open the database at ${config.databasePath}: ${err instanceof Error ? err.message : String(err)}. Check DATABASE_PATH and that the folder is writable.`);
+}
 const messenger = await connectToSent(config);
 const reminders = createReminders({ store, messenger, config });
 
@@ -68,5 +75,8 @@ function shutdown() {
   setTimeout(() => process.exit(1), 10_000).unref();
 }
 
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled error:', reason);
+});
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);

@@ -27,7 +27,7 @@
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; overflow-x: clip; }
 body {
   margin: 0;
   background: var(--bg);
@@ -256,6 +256,7 @@ h2 { font-size: 17px; font-weight: 500; letter-spacing: -0.015em; }
 /* Confirmation */
 .booked-head { display: flex; align-items: center; gap: 16px; margin-bottom: 22px; }
 .check { display: grid; place-items: center; flex: none; width: 52px; height: 52px; border-radius: 50%; background: #1a7f3714; color: var(--good); }
+.check.off { background: #130f0c0f; color: var(--muted); }
 .check svg path { stroke-dasharray: 26; stroke-dashoffset: 26; animation: draw 0.6s 0.25s var(--ease) forwards; }
 .booked-head h2 { font-size: 26px; font-weight: 500; letter-spacing: -0.025em; }
 .details { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px 24px; margin: 0 0 26px; }
@@ -334,7 +335,7 @@ dialog::backdrop { background: #130f0c40; backdrop-filter: blur(3px); }
 }
 
 @media (max-width: 960px) {
-  .split { grid-template-columns: minmax(0, 1fr); }
+  .split, .split.wide { grid-template-columns: minmax(0, 1fr); }
   .panel { border-left: 0; border-top: 1px solid var(--line); }
   .hero { grid-template-columns: 1fr; gap: 20px; }
   .band.pad, .band.tight, .topbar-inner, .pane { padding-left: 20px; padding-right: 20px; }
@@ -348,4 +349,9 @@ dialog::backdrop { background: #130f0c40; backdrop-filter: blur(3px); }
   .steps li { gap: 6px; padding: 8px 10px; font-size: 12px; }
   .steps li span { display: none; }
   .diagram-band { display: none; }
+  .section-title { flex-wrap: wrap; }
+  .tabs { border-radius: 18px; }
+  .topbar-inner { flex-wrap: wrap; gap: 10px; padding-top: 12px; padding-bottom: 12px; }
+  .brand { min-width: 0; font-size: 16px; }
+  .top-actions { flex-wrap: wrap; gap: 8px; }
 }

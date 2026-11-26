@@ -19,20 +19,25 @@ const relative = (iso) => (new Date(iso) > Date.now() ? until(iso) : ago(iso));
 const channelName = (channel) => (channel ? channel.toUpperCase() : null);
 const listOf = (items) => (items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} or ${items.at(-1)}`);
 
+const isPast = (a) => new Date(a.startsAt) <= Date.now();
+const isFuture = (a) => a.status !== 'cancelled' && !isPast(a);
+
 function renderStats() {
-  const live = appointments.filter((a) => a.status !== 'cancelled');
+  const future = appointments.filter(isFuture);
   const attention = appointments.filter((a) => a.attention).length;
-  $('stat-upcoming').textContent = live.filter((a) => a.status === 'scheduled' && !a.attention).length;
-  $('stat-confirmed').textContent = live.filter((a) => a.status === 'confirmed').length;
+  $('stat-upcoming').textContent = future.filter((a) => a.status === 'scheduled' && !a.attention).length;
+  $('stat-confirmed').textContent = future.filter((a) => a.status === 'confirmed').length;
   $('stat-attention').textContent = attention;
   $('stat-attention-card').classList.toggle('hot', attention > 0);
-  $('stat-cancelled').textContent = appointments.length - live.length;
+  $('stat-cancelled').textContent = appointments.filter((a) => a.status === 'cancelled').length;
 }
 
 function matchesFilter(a) {
   if (filter === 'all') return true;
   if (filter === 'attention') return Boolean(a.attention);
-  if (filter === 'scheduled') return a.status === 'scheduled' && !a.attention;
+  if (filter === 'past') return a.status !== 'cancelled' && isPast(a);
+  if (filter === 'scheduled') return isFuture(a) && a.status === 'scheduled' && !a.attention;
+  if (filter === 'confirmed') return isFuture(a) && a.status === 'confirmed';
   return a.status === filter;
 }
 
@@ -51,7 +56,10 @@ function reminderPill(a) {
 function renderList() {
   const list = $('list');
   list.replaceChildren();
-  const rows = appointments.filter(matchesFilter);
+  const group = (a) => (a.status === 'cancelled' ? 2 : isPast(a) ? 1 : 0);
+  const rows = appointments
+    .filter(matchesFilter)
+    .sort((a, b) => group(a) - group(b) || (group(a) === 0 ? -1 : 1) * (new Date(b.startsAt) - new Date(a.startsAt)));
   $('empty').hidden = rows.length > 0;
 
   rows.forEach((a, n) => {
@@ -65,7 +73,7 @@ function renderList() {
     who.append(name, el('span', '', `${a.phone}  ·  ${when(a.startsAt)} (${until(a.startsAt)})`));
 
     const meta = el('div', 'meta');
-    meta.append(pill(label(a.status), a.status));
+    meta.append(isPast(a) && a.status !== 'cancelled' ? pill('past', '') : pill(label(a.status), a.status));
     if (a.attention === 'reschedule') meta.append(pill('Asked to reschedule', 'reschedule_requested'));
     if (a.attention === 'no_reply') meta.append(pill('No reply yet', 'failed'));
     if (a.confirmationMessageId) {
@@ -79,7 +87,7 @@ function renderList() {
     row.append(who);
 
     const actions = el('div', 'actions');
-    if (a.status !== 'cancelled') {
+    if (isFuture(a)) {
       const move = el('button', `btn btn-sm ${a.attention === 'reschedule' ? 'btn-primary' : 'btn-ghost'}`, 'Reschedule');
       move.type = 'button';
       move.addEventListener('click', () => openReschedule(a));
@@ -222,7 +230,12 @@ async function init() {
   rollify();
   await refresh();
   api('/api/admin/templates').then(renderNotice).catch(() => undefined);
-  setInterval(refresh, 4000);
+  setInterval(() => {
+    if (!document.hidden && !$('reschedule').open) refresh();
+  }, 4000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) refresh();
+  });
 }
 
 init();

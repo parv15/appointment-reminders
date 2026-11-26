@@ -75,7 +75,7 @@ async function api(path, options = {}) {
     location.href = '/admin/login';
   }
   if (!response.ok) {
-    throw new Error(body.error ?? `Request failed (${response.status})`);
+    throw Object.assign(new Error(body.error ?? `Request failed (${response.status})`), { status: response.status, code: body.code });
   }
   return body;
 }
@@ -85,7 +85,7 @@ async function attempt(action) {
     return { ok: true, value: await action() };
   } catch (err) {
     showError(err.message);
-    return { ok: false };
+    return { ok: false, error: err };
   }
 }
 

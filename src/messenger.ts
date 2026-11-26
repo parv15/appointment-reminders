@@ -46,7 +46,7 @@ const PURPOSES: Record<keyof TemplateLists, string> = {
 const names = (list: string) => list.split(',').map((n) => n.trim()).filter(Boolean);
 
 export function createSentMessenger(options: { sandbox: boolean; templates: TemplateLists }): Messenger {
-  const client = new SentDm();
+  const client = new SentDm({ timeout: 15_000 });
   const { sandbox, templates } = options;
 
   let statuses = new Map<string, string | undefined>();
@@ -101,7 +101,7 @@ export function createSentMessenger(options: { sandbox: boolean; templates: Temp
       try {
         await client.messages.cancel(messageId, { sandbox });
       } catch (err) {
-        if (!(err instanceof SentDm.ConflictError)) {
+        if (!(err instanceof SentDm.ConflictError || err instanceof SentDm.NotFoundError)) {
           throw err;
         }
       }

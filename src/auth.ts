@@ -54,6 +54,9 @@ export function createAdminAuth(password: string): AdminAuth {
 
     login(req, res) {
       const key = req.ip ?? 'unknown';
+      for (const [address, entry] of failures) {
+        if (entry.resetAt <= Date.now()) failures.delete(address);
+      }
       const record = failures.get(key);
       if (record && record.resetAt > Date.now() && record.count >= MAX_FAILURES) {
         res.status(429).json({ error: 'Too many attempts. Try again in a few minutes.' });

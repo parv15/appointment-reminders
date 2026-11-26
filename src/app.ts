@@ -6,19 +6,29 @@ import { createAdminAuth } from './auth.js';
 import type { Config } from './config.js';
 import { explainSentError } from './errors.js';
 import type { TemplateReport } from './messenger.js';
-import { ValidationError, type Reminders } from './reminders.js';
+import { createRateLimiter } from './rate-limit.js';
+import { ValidationError, type InboundPayload, type Reminders } from './reminders.js';
 import { verifyWebhook } from './signature.js';
-import { availableSlots, localDate } from './slots.js';
+import { availableSlots, isRealDate, localDate, upcomingDays } from './slots.js';
 import type { Appointment, Store } from './store.js';
 
 const E164 = /^\+[1-9]\d{6,14}$/;
 const NAME = /^\p{L}[\p{L} '’-]{1,29}$/u;
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const PUBLIC_DIR = fileURLToPath(new URL('../public', import.meta.url));
 const ADMIN_DIR = fileURLToPath(new URL('../admin', import.meta.url));
 const LOGIN_PAGE = fileURLToPath(new URL('../public/admin-login.html', import.meta.url));
 
-const optionalNumber = (value: unknown) => (typeof value === 'number' ? value : undefined);
+const optionalMinutes = (value: unknown): number | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'number' || !Number.isInteger(value)) throw new ValidationError('Choose one of the offered reminder times.', 'slot_unavailable');
+  return value;
+};
+
+const parseStart = (value: unknown, message: string) => {
+  const start = typeof value === 'string' ? new Date(value) : new Date(NaN);
+  if (Number.isNaN(start.getTime())) throw new ValidationError(message);
+  return start;
+};
 
 const header = (req: express.Request, name: string) =>
   req.header(`webhook-${name}`) ?? req.header(`x-webhook-${name}`) ?? '';
@@ -40,6 +50,8 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
   const { store, reminders, config, templateReport } = deps;
   const app = express();
   const auth = createAdminAuth(config.adminPassword);
+  const bookingLimiter = createRateLimiter(config.bookingsPerHourPerIp, 60 * 60_000);
+  app.set('trust proxy', config.trustProxy);
 
   app.post('/webhooks/sent', express.raw({ type: 'application/json' }), async (req, res) => {
     if (!config.webhookSecret) {
@@ -56,21 +68,37 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
       return;
     }
 
-    res.json({ received: true });
+    const eventId = header(req, 'id');
+    if (!store.claimEvent(eventId)) {
+      res.json({ received: true, duplicate: true });
+      return;
+    }
 
-    if (!store.markEventSeen(header(req, 'id'))) return;
+    let event: { field?: unknown; event?: unknown; payload?: Record<string, unknown> | null };
+    try {
+      event = JSON.parse(req.body.toString('utf8'));
+    } catch {
+      res.status(400).json({ error: 'The webhook body is not valid JSON.' });
+      return;
+    }
 
     try {
-      const event = JSON.parse(req.body.toString('utf8'));
-      if (event.field !== 'message') return;
-      if (event.event === 'message.received') {
-        await reminders.handleInbound(event.payload);
-      } else {
-        reminders.handleStatus(event.event, event.payload ?? {});
+      if (event?.field === 'message' && typeof event.event === 'string') {
+        const payload = event.payload ?? {};
+        if (event.event === 'message.received') {
+          if (typeof payload.inbound_number === 'string') {
+            await reminders.handleInbound(payload as unknown as InboundPayload);
+          }
+        } else {
+          reminders.handleStatus(event.event, payload as { message_id?: string; channel?: string });
+        }
       }
+      res.json({ received: true });
     } catch (err) {
+      store.releaseEvent(eventId);
       const explained = explainSentError(err);
-      console.error(`Webhook ${header(req, 'id')} failed: ${explained?.message ?? (err instanceof Error ? err.message : err)}`);
+      console.error(`Webhook ${eventId} failed: ${explained?.message ?? (err instanceof Error ? err.message : err)}`);
+      res.status(500).json({ error: 'The event could not be processed. It can be delivered again.' });
     }
   });
 
@@ -98,19 +126,24 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
       defaultCountryCode: config.defaultCountryCode,
       reminderOptions: config.reminderOptions,
       maxAdvanceDays: config.slotRules.maxAdvanceDays,
+      days: upcomingDays(new Date(), config.timezone, config.slotRules.maxAdvanceDays + 1),
       confirmationAlerts: config.confirmationTemplateName !== '',
     });
   });
 
   app.get('/api/slots', (req, res) => {
     const date = String(req.query.date ?? '');
-    if (!DATE.test(date)) throw new ValidationError('Pick a valid date.');
+    if (!isRealDate(date)) throw new ValidationError('Pick a valid date.');
     const exclude = typeof req.query.exclude === 'string' ? req.query.exclude : undefined;
     const slots = availableSlots(date, config.slotRules, store.takenStarts(exclude), new Date());
     res.json({ date, slots: slots.map((s) => s.toISOString()) });
   });
 
   app.post('/api/bookings', async (req, res) => {
+    if (!bookingLimiter.allow(req.ip ?? 'unknown')) {
+      res.status(429).json({ error: 'Too many booking attempts from this connection. Try again in an hour.' });
+      return;
+    }
     const { service, name, phone, startsAt, reminderMinutes } = req.body ?? {};
     if (typeof service !== 'string' || !config.services.includes(service)) throw new ValidationError('Choose a service.');
     if (typeof name !== 'string' || !NAME.test(name.trim())) {
@@ -119,14 +152,15 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
     if (typeof phone !== 'string' || !E164.test(phone)) {
       throw new ValidationError('Enter a valid mobile number.');
     }
-    const start = typeof startsAt === 'string' ? new Date(startsAt) : new Date(NaN);
-    if (Number.isNaN(start.getTime())) throw new ValidationError('Pick a date and time.');
+    const start = parseStart(startsAt, 'Pick a date and time.');
+    const minutes = optionalMinutes(reminderMinutes);
+    const repeat = store.findActive(phone, start.toISOString());
     const open = availableSlots(localDate(start, config.timezone), config.slotRules, store.takenStarts(), new Date());
-    if (!open.some((s) => s.getTime() === start.getTime())) {
-      throw new ValidationError('That time is no longer available. Please pick another slot.');
+    if (!repeat && !open.some((s) => s.getTime() === start.getTime())) {
+      throw new ValidationError('That time is no longer available. Please pick another slot.', 'slot_unavailable');
     }
 
-    const booking = await reminders.book({ name: name.trim(), service, phone, startsAt: start.toISOString(), reminderMinutes: optionalNumber(reminderMinutes) });
+    const booking = await reminders.book({ name: name.trim(), service, phone, startsAt: start.toISOString(), reminderMinutes: minutes });
     res.status(201).json({ ...publicView(booking, config.reminderOptions[0]!), ...(booking.confirmationError && { alertError: booking.confirmationError }) });
   });
 
@@ -159,15 +193,15 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
 
   app.post('/api/admin/appointments/:id/reschedule', async (req, res) => {
     const { startsAt, reminderMinutes } = req.body ?? {};
-    const start = typeof startsAt === 'string' ? new Date(startsAt) : new Date(NaN);
-    if (Number.isNaN(start.getTime())) throw new ValidationError('Pick a date and time.');
+    const start = parseStart(startsAt, 'Pick a date and time.');
+    const minutes = optionalMinutes(reminderMinutes);
 
     const open = availableSlots(localDate(start, config.timezone), config.slotRules, store.takenStarts(req.params.id), new Date());
     if (!open.some((s) => s.getTime() === start.getTime())) {
-      throw new ValidationError('That time is not available. Pick another slot.');
+      throw new ValidationError('That time is not available. Pick another slot.', 'slot_unavailable');
     }
 
-    const moved = await reminders.reschedule(req.params.id, { startsAt: start.toISOString(), reminderMinutes: optionalNumber(reminderMinutes) });
+    const moved = await reminders.reschedule(req.params.id, { startsAt: start.toISOString(), reminderMinutes: minutes });
     if (!moved) {
       res.status(404).json({ error: 'Appointment not found.' });
       return;
@@ -194,11 +228,16 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
 
   const onError: ErrorRequestHandler = (err, _req, res, _next) => {
     if (err instanceof ValidationError) {
-      res.status(400).json({ error: err.message });
+      res.status(400).json({ error: err.message, ...(err.code && { code: err.code }) });
       return;
     }
     if (err instanceof SyntaxError && 'body' in err) {
       res.status(400).json({ error: 'The request body is not valid JSON.' });
+      return;
+    }
+    const httpStatus = (err as { status?: unknown })?.status;
+    if (typeof httpStatus === 'number' && httpStatus >= 400 && httpStatus < 500) {
+      res.status(httpStatus).json({ error: httpStatus === 413 ? 'The request is too large.' : 'The request could not be read.' });
       return;
     }
     const explained = explainSentError(err);

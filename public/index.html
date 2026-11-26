@@ -145,12 +145,12 @@
 
         <div id="step-3" hidden>
           <div class="booked-head">
-            <span class="check" aria-hidden="true">
+            <span class="check" id="booked-check" aria-hidden="true">
               <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>
             </span>
             <div>
-              <h2>You are booked</h2>
-              <p class="muted" id="booked-sub"></p>
+              <h2 id="booked-title">You are booked</h2>
+              <p class="muted" id="booked-sub" role="status" aria-live="polite"></p>
             </div>
           </div>
 
@@ -162,7 +162,7 @@
           </dl>
           <p id="alert-error" class="alert-error" hidden></p>
 
-          <div class="reply-guide">
+          <div class="reply-guide" id="reply-guide">
             <span class="eyebrow">How to reply to our texts</span>
             <ul>
               <li><kbd>C</kbd><span>Confirm you will attend</span></li>

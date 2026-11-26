@@ -11,7 +11,8 @@ export function verifyWebhook(
   if (!secret || !headers.id || !headers.timestamp || !headers.signature) {
     return false;
   }
-  if (Math.abs(nowSeconds - Number(headers.timestamp)) > REPLAY_WINDOW_SECONDS) {
+  const timestamp = Number(headers.timestamp);
+  if (!Number.isFinite(timestamp) || Math.abs(nowSeconds - timestamp) > REPLAY_WINDOW_SECONDS) {
     return false;
   }
 

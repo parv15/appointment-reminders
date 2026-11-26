@@ -3,6 +3,8 @@ import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
 
+export class SlotTakenError extends Error {}
+
 export type AppointmentStatus = 'scheduled' | 'confirmed' | 'reschedule_requested' | 'cancelled';
 
 export interface Appointment {
@@ -43,6 +45,8 @@ interface Row {
   created_at: string;
 }
 
+const EVENT_RETENTION_MS = 30 * 24 * 60 * 60_000;
+
 const COLUMNS: Record<string, string> = {
   service: 'TEXT',
   last_reply: 'TEXT',
@@ -73,6 +77,8 @@ const toAppointment = (row: Row): Appointment => ({
   createdAt: row.created_at,
 });
 
+const isUniqueViolation = (err: unknown) => err instanceof Error && err.message.includes('UNIQUE');
+
 export class Store {
   private readonly db: DatabaseSync;
 
@@ -81,6 +87,7 @@ export class Store {
       mkdirSync(dirname(path), { recursive: true });
     }
     this.db = new DatabaseSync(path);
+    this.db.exec('PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS appointments (
         id TEXT PRIMARY KEY,
@@ -94,7 +101,7 @@ export class Store {
       );
       CREATE INDEX IF NOT EXISTS appointments_phone ON appointments (phone);
       CREATE INDEX IF NOT EXISTS appointments_reminder ON appointments (reminder_message_id);
-      CREATE TABLE IF NOT EXISTS seen_events (id TEXT PRIMARY KEY);
+      CREATE TABLE IF NOT EXISTS seen_events (id TEXT PRIMARY KEY, seen_at TEXT);
     `);
 
     const existing = (this.db.prepare('PRAGMA table_info(appointments)').all() as unknown as { name: string }[]).map((c) => c.name);
@@ -102,6 +109,18 @@ export class Store {
       if (!existing.includes(column)) {
         this.db.exec(`ALTER TABLE appointments ADD COLUMN ${column} ${type}`);
       }
+    }
+
+    const eventColumns = (this.db.prepare('PRAGMA table_info(seen_events)').all() as unknown as { name: string }[]).map((c) => c.name);
+    if (!eventColumns.includes('seen_at')) {
+      this.db.exec('ALTER TABLE seen_events ADD COLUMN seen_at TEXT');
+    }
+    this.db.prepare('DELETE FROM seen_events WHERE seen_at < ?').run(new Date(Date.now() - EVENT_RETENTION_MS).toISOString());
+
+    try {
+      this.db.exec("CREATE UNIQUE INDEX IF NOT EXISTS appointments_active_slot ON appointments (starts_at) WHERE status != 'cancelled'");
+    } catch {
+      console.warn('Warning: the database already holds two active appointments at the same time, so the one-booking-per-slot guard is off. Cancel one of them and restart.');
     }
   }
 
@@ -120,9 +139,13 @@ export class Store {
       lastReplyAt: null,
       createdAt: new Date().toISOString(),
     };
-    this.db
-      .prepare('INSERT INTO appointments (id, name, service, phone, starts_at, status, reminder_lead_minutes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(appointment.id, appointment.name, appointment.service, appointment.phone, appointment.startsAt, appointment.status, appointment.reminderLeadMinutes, appointment.createdAt);
+    try {
+      this.db
+        .prepare('INSERT INTO appointments (id, name, service, phone, starts_at, status, reminder_lead_minutes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(appointment.id, appointment.name, appointment.service, appointment.phone, appointment.startsAt, appointment.status, appointment.reminderLeadMinutes, appointment.createdAt);
+    } catch (err) {
+      throw isUniqueViolation(err) ? new SlotTakenError() : err;
+    }
     return appointment;
   }
 
@@ -150,6 +173,18 @@ export class Store {
     return rows.map(toAppointment).find((a) => new Date(a.startsAt) > now);
   }
 
+  findActive(phone: string, startsAt: string): Appointment | undefined {
+    const row = this.db.prepare("SELECT * FROM appointments WHERE phone = ? AND starts_at = ? AND status != 'cancelled'").get(phone, startsAt) as Row | undefined;
+    return row && toAppointment(row);
+  }
+
+  countUpcomingByPhone(phone: string, now: Date): number {
+    const row = this.db
+      .prepare("SELECT COUNT(*) AS n FROM appointments WHERE phone = ? AND status != 'cancelled' AND starts_at > ?")
+      .get(phone, now.toISOString()) as unknown as { n: number };
+    return row.n;
+  }
+
   setReminder(id: string, messageId: string): void {
     this.db
       .prepare("UPDATE appointments SET reminder_message_id = ?, reminder_status = 'queued', reminder_channel = NULL WHERE id = ?")
@@ -161,9 +196,13 @@ export class Store {
   }
 
   reschedule(id: string, startsAt: string, reminderLeadMinutes: number): void {
-    this.db
-      .prepare("UPDATE appointments SET starts_at = ?, reminder_lead_minutes = ?, status = 'scheduled', last_reply = NULL, last_reply_at = NULL WHERE id = ?")
-      .run(startsAt, reminderLeadMinutes, id);
+    try {
+      this.db
+        .prepare("UPDATE appointments SET starts_at = ?, reminder_lead_minutes = ?, status = 'scheduled', last_reply = NULL, last_reply_at = NULL WHERE id = ?")
+        .run(startsAt, reminderLeadMinutes, id);
+    } catch (err) {
+      throw isUniqueViolation(err) ? new SlotTakenError() : err;
+    }
   }
 
   delete(id: string): void {
@@ -187,9 +226,13 @@ export class Store {
       .run(status, channel ?? null, messageId);
   }
 
-  markEventSeen(eventId: string): boolean {
-    const result = this.db.prepare('INSERT OR IGNORE INTO seen_events (id) VALUES (?)').run(eventId);
+  claimEvent(eventId: string): boolean {
+    const result = this.db.prepare('INSERT OR IGNORE INTO seen_events (id, seen_at) VALUES (?, ?)').run(eventId, new Date().toISOString());
     return result.changes > 0;
+  }
+
+  releaseEvent(eventId: string): void {
+    this.db.prepare('DELETE FROM seen_events WHERE id = ?').run(eventId);
   }
 
   close(): void {

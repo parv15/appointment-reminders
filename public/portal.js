@@ -126,18 +126,33 @@ function renderSummary() {
   );
 }
 
+const BOOKED_TITLES = {
+  scheduled: 'You are booked',
+  confirmed: 'You confirmed your appointment',
+  reschedule_requested: 'We got your request to reschedule',
+  cancelled: 'This appointment was cancelled',
+};
+
 function renderBooked(b) {
   const status = b.alertStatus;
   const failed = ['failed', 'blocked'].includes(status);
   const delivered = ['delivered', 'read'].includes(status);
+  const cancelled = b.status === 'cancelled';
 
-  $('booked-sub').textContent = !status
-    ? 'Your appointment is confirmed.'
-    : failed
-      ? `We could not text ${b.phone}. Your appointment is still booked.`
-      : delivered
-        ? `Confirmation texted to ${b.phone}.`
-        : `Sending a confirmation text to ${b.phone}.`;
+  $('booked-title').textContent = BOOKED_TITLES[b.status] ?? BOOKED_TITLES.scheduled;
+  $('booked-check').classList.toggle('off', cancelled);
+  $('reply-guide').hidden = cancelled;
+  $('booked-sub').textContent = cancelled
+    ? 'The clinic cancelled this appointment. You can book another time below.'
+    : b.status === 'reschedule_requested'
+      ? 'We will contact you soon to find a new time.'
+      : !status
+        ? 'Your appointment is confirmed.'
+        : failed
+          ? `We could not text ${b.phone}. Your appointment is still booked.`
+          : delivered
+            ? `Confirmation texted to ${b.phone}.`
+            : `Sending a confirmation text to ${b.phone}.`;
   $('d-service').textContent = b.service;
   $('d-name').textContent = b.name;
   $('d-when').textContent = tidy(whenFormat().format(new Date(b.startsAt)));
@@ -150,17 +165,34 @@ function renderBooked(b) {
   renderChecks(b);
   if ($('step-3').hidden) show(3);
   else for (const li of $('steps').children) if (Number(li.dataset.step) === 3 && delivered) li.className = 'done';
-  return delivered || failed;
+  return cancelled || delivered || failed;
 }
 
-async function poll() {
+function forgetBooking() {
   clearTimeout(pollTimer);
-  const latest = await api(`/api/bookings/${booking.id}`).catch(() => null);
-  if (latest) {
-    booking = { ...booking, ...latest };
-    if (renderBooked(booking)) return;
+  sessionStorage.removeItem('bookingId');
+  booking = null;
+}
+
+async function poll(ticks = 0) {
+  clearTimeout(pollTimer);
+  const id = booking?.id;
+  if (!id) return;
+  let settled = false;
+  try {
+    booking = { ...booking, ...(await api(`/api/bookings/${id}`)) };
+    settled = renderBooked(booking);
+  } catch (err) {
+    if (err.status === 404) {
+      forgetBooking();
+      selection = null;
+      picker.reset();
+      show(1);
+      showError('That booking no longer exists. You can book a new time.');
+      return;
+    }
   }
-  pollTimer = setTimeout(poll, 3000);
+  if (ticks < (settled ? 40 : 600)) pollTimer = setTimeout(() => poll(ticks + 1), settled ? 15_000 : 3000);
 }
 
 $('to-details').addEventListener('click', () => {
@@ -175,8 +207,13 @@ $('details').elements.name.addEventListener('input', renderPreview);
 $('details').addEventListener('submit', async (event) => {
   event.preventDefault();
   const data = new FormData($('details'));
-  const digits = String(data.get('number')).replace(/\D/g, '').replace(/^0+/, '');
-  const phone = `${data.get('code')}${digits}`;
+  const typed = String(data.get('number')).trim();
+  const digits = typed.replace(/\D/g, '');
+  const phone = typed.startsWith('+')
+    ? `+${digits}`
+    : digits.startsWith('00')
+      ? `+${digits.slice(2)}`
+      : `${data.get('code')}${digits.replace(/^0+/, '')}`;
   const submit = $('details').querySelector('button[type="submit"]');
 
   submit.disabled = true;
@@ -189,8 +226,10 @@ $('details').addEventListener('submit', async (event) => {
   submit.disabled = false;
 
   if (!result.ok) {
-    picker.reset();
-    show(1);
+    if (result.error.code === 'slot_unavailable') {
+      picker.reset();
+      show(1);
+    }
     return;
   }
   booking = result.value;
@@ -201,9 +240,7 @@ $('details').addEventListener('submit', async (event) => {
 });
 
 $('book-another').addEventListener('click', () => {
-  clearTimeout(pollTimer);
-  sessionStorage.removeItem('bookingId');
-  booking = null;
+  forgetBooking();
   selection = null;
   $('details').reset();
   $('to-details').disabled = true;
@@ -253,7 +290,7 @@ async function init() {
   renderPreview();
 
   const savedId = sessionStorage.getItem('bookingId');
-  const saved = savedId ? await api(`/api/bookings/${savedId}`).catch(() => null) : null;
+  const saved = savedId ? await api(`/api/bookings/${encodeURIComponent(savedId)}`).catch(() => null) : null;
   if (saved) {
     booking = saved;
     renderBooked(saved);
