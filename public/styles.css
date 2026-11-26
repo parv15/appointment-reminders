@@ -285,9 +285,10 @@ h2 { font-size: 17px; font-weight: 500; letter-spacing: -0.015em; }
 .row.appear { animation: rise 0.5s var(--ease) both; animation-delay: calc(var(--n, 0) * 50ms); }
 .row:first-child { padding-top: 4px; border-top: 0; }
 .row.cancelled { opacity: 0.5; }
-.avatar { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--fg); color: #fdfcfc; font-size: 13px; font-weight: 600; }
-.row.attention .avatar { background: var(--warn); }
-.row.attention.no_reply .avatar { background: var(--bad); }
+.avatar { display: block; flex: none; width: 40px; height: 40px; border-radius: 50%; overflow: hidden; background: #eceae8; }
+.avatar svg { display: block; width: 100%; height: 100%; }
+.row.attention .avatar { box-shadow: 0 0 0 2px var(--warn); }
+.row.attention.no_reply .avatar { box-shadow: 0 0 0 2px var(--bad); }
 .who { min-width: 0; overflow-wrap: anywhere; }
 .who strong { font-weight: 500; }
 .service { margin-left: 8px; padding: 1px 8px; border-radius: 6px; background: var(--line); color: var(--muted); font: 500 11.5px/1.7 var(--mono); }

@@ -149,14 +149,14 @@ function renderBooked(b) {
       : !status
         ? 'Your appointment is confirmed.'
         : failed
-          ? `We could not text ${b.phone}. Your appointment is still booked.`
+          ? `We could not text ${formatPhone(b.phone)}. Your appointment is still booked.`
           : delivered
-            ? `Confirmation texted to ${b.phone}.`
-            : `Sending a confirmation text to ${b.phone}.`;
+            ? `Confirmation texted to ${formatPhone(b.phone)}.`
+            : `Sending a confirmation text to ${formatPhone(b.phone)}.`;
   $('d-service').textContent = b.service;
   $('d-name').textContent = b.name;
   $('d-when').textContent = tidy(whenFormat().format(new Date(b.startsAt)));
-  $('d-phone').textContent = b.phone;
+  $('d-phone').textContent = formatPhone(b.phone);
   $('alert-error').hidden = !failed;
   $('alert-error').textContent = failed ? `Delivery status: ${status}. Check the number, then book again.` : '';
   $('reminder-note').textContent = `We will text you a reminder on ${reminderTime(b.startsAt, b.reminderMinutes)}, ${duration(b.reminderMinutes)} before your appointment.${config.repliesPossible === false ? '' : ' You can reply to that message to confirm or to reschedule.'}`;

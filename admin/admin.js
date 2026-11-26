@@ -65,12 +65,12 @@ function renderList() {
   rows.forEach((a, n) => {
     const row = el('li', `row ${a.status}${a.attention ? ` attention ${a.attention}` : ''}`);
     appearIfNew(row, `row:${a.id}`, n);
-    row.append(el('span', 'avatar', initials(a.name)));
+    row.append(avatarFor(a.name));
 
     const who = el('div', 'who');
     const name = el('strong', '', a.name);
     name.append(el('span', 'service', a.service));
-    who.append(name, el('span', '', `${a.phone}  ·  ${when(a.startsAt)} (${until(a.startsAt)})`));
+    who.append(name, el('span', '', `${formatPhone(a.phone)}  ·  ${when(a.startsAt)} (${until(a.startsAt)})`));
 
     const meta = el('div', 'meta');
     meta.append(isPast(a) && a.status !== 'cancelled' ? pill('past', '') : pill(label(a.status), a.status));
@@ -112,10 +112,10 @@ function renderList() {
 
 const FEED = {
   booked: { icon: '+', text: (i) => `${i.name} booked ${i.service} for ${when(i.startsAt)}` },
-  alert: { icon: '!', text: (i) => `Confirmation text sent to ${i.phone}` },
+  alert: { icon: '!', text: (i) => `Confirmation text sent to ${formatPhone(i.phone)}` },
   reminder: {
     icon: 'R',
-    text: (i) => (i.status === 'scheduled' ? `Reminder for ${i.phone} is due ${when(i.detail)}` : `Reminder sent to ${i.phone}`),
+    text: (i) => (i.status === 'scheduled' ? `Reminder for ${formatPhone(i.phone)} is due ${when(i.detail)}` : `Reminder sent to ${formatPhone(i.phone)}`),
   },
   reply: { icon: '\u21A9', text: (i) => `${i.name} replied "${i.detail}"` },
 };
