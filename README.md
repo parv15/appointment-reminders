@@ -396,17 +396,29 @@ Before you go live, set `ADMIN_PASSWORD` and serve the app over HTTPS. Keep the 
 
 ## FAQ
 
-**Why do the texts leave out "Reply C to confirm or R to reschedule"?** The reply wording lives in the templates, and Sent has to approve a template before it can be used. Until yours are approved, the app uses Sent's standard templates, which do not include that line. The booking page tells customers how to reply in the meantime, and the dashboard shows a notice. When your templates become `APPROVED`, the app switches to them within five minutes.
+**Why do the texts leave out "Reply C to confirm or R to reschedule"?**
 
-**Can I change the reminder wording?** Yes. Edit the JSON files in [`docs/templates`](docs/templates), create new templates with `npm run setup:templates`, and put their names first in `SENT_TEMPLATE_NAME` and `SENT_CONFIRMATION_TEMPLATE`. The variable names must match the ones used in [`src/reminders.ts`](src/reminders.ts).
+The reply wording lives in the templates, and Sent has to approve a template before it can be used. Until yours are approved, the app uses Sent's standard templates, which do not include that line. The booking page tells customers how to reply in the meantime, and the dashboard shows a notice. When your templates become `APPROVED`, the app switches to them within five minutes.
 
-**Does it work without a webhook?** Bookings, confirmations, reminders and delivery status all work. Customer replies need the webhook, because that is how Sent hands them to the app.
+**Can I change the reminder wording?**
 
-**What does sandbox mode do?** Sent validates each request and sends nothing. Its responses are sample data, so reading a sandbox message back returns 404, and the app skips status polling. If you leave sandbox mode on in production, Sent still answers 202 but never delivers anything, so check the mode badge at the top of the page.
+Yes. Edit the JSON files in [`docs/templates`](docs/templates), create new templates with `npm run setup:templates`, and put their names first in `SENT_TEMPLATE_NAME` and `SENT_CONFIRMATION_TEMPLATE`. The variable names must match the ones used in [`src/reminders.ts`](src/reminders.ts).
 
-**Why only one instance?** Bookings live in a SQLite file and the status polling state lives in memory. Two instances would each poll, and a SQLite file cannot be shared safely over a network disk.
+**Does it work without a webhook?**
 
-**Can a customer have several appointments?** Yes. A reply applies to the customer's next upcoming appointment, which the app finds by phone number.
+Bookings, confirmations, reminders and delivery status all work. Customer replies need the webhook, because that is how Sent hands them to the app.
+
+**What does sandbox mode do?**
+
+Sent validates each request and sends nothing. Its responses are sample data, so reading a sandbox message back returns 404, and the app skips status polling. If you leave sandbox mode on in production, Sent still answers 202 but never delivers anything, so check the mode badge at the top of the page.
+
+**Why only one instance?**
+
+Bookings live in a SQLite file and the status polling state lives in memory. Two instances would each poll, and a SQLite file cannot be shared safely over a network disk.
+
+**Can a customer have several appointments?**
+
+Yes. A reply applies to the customer's next upcoming appointment, which the app finds by phone number.
 
 ## Contributing
 
