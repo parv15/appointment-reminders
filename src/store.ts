@@ -102,6 +102,10 @@ export class Store {
     this.db.prepare("UPDATE appointments SET reminder_message_id = ?, reminder_status = 'queued' WHERE id = ?").run(messageId, id);
   }
 
+  delete(id: string): void {
+    this.db.prepare('DELETE FROM appointments WHERE id = ?').run(id);
+  }
+
   setStatus(id: string, status: AppointmentStatus): void {
     this.db.prepare('UPDATE appointments SET status = ? WHERE id = ?').run(status, id);
   }

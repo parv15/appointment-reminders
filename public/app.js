@@ -1,21 +1,66 @@
 const form = document.getElementById('booking');
 const rows = document.getElementById('rows');
 const empty = document.getElementById('empty');
-const error = document.getElementById('error');
+const toast = document.getElementById('toast');
 const phonePanel = document.getElementById('phone');
 const thread = document.getElementById('thread');
 const reply = document.getElementById('reply');
 const hint = document.getElementById('phone-hint');
+const submit = form.querySelector('button[type="submit"]');
 
 let demo = false;
 let selectedPhone = null;
+let toastTimer;
 
 const label = (value) => (value ?? '-').replaceAll('_', ' ');
+
+function showError(message) {
+  toast.textContent = message;
+  toast.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (toast.hidden = true), 8000);
+}
+
+async function api(path, options = {}) {
+  let response;
+  try {
+    response = await fetch(path, {
+      ...options,
+      headers: options.body ? { 'Content-Type': 'application/json' } : undefined,
+    });
+  } catch {
+    throw new Error('Cannot reach the server. Is it still running?');
+  }
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(body.error ?? `Request failed (${response.status})`);
+  }
+  return body;
+}
+
+async function attempt(action) {
+  try {
+    await action();
+    return true;
+  } catch (err) {
+    showError(err.message);
+    return false;
+  }
+}
 
 function cell(text) {
   const td = document.createElement('td');
   td.textContent = text;
   return td;
+}
+
+function linkButton(text, onClick) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'link';
+  button.textContent = text;
+  button.addEventListener('click', onClick);
+  return button;
 }
 
 function render(appointments) {
@@ -31,28 +76,30 @@ function render(appointments) {
     pill.className = `pill ${a.status}`;
     pill.textContent = label(a.status);
     status.append(pill);
-    tr.append(status, cell(label(a.reminderStatus)));
+
+    const reminder = document.createElement('td');
+    const reminderPill = document.createElement('span');
+    reminderPill.className = `pill ${a.reminderStatus ?? ''}`;
+    reminderPill.textContent = label(a.reminderStatus);
+    reminder.append(reminderPill);
+    tr.append(status, reminder);
 
     const action = document.createElement('td');
     if (demo) {
-      const view = document.createElement('button');
-      view.className = 'link';
-      view.textContent = 'Open phone';
-      view.addEventListener('click', () => {
-        selectedPhone = a.phone;
-        loadThread();
-      });
-      action.append(view, ' ');
+      action.append(
+        linkButton('Open phone', () => {
+          selectedPhone = a.phone;
+          refresh();
+        }),
+        ' ',
+      );
     }
     if (a.status !== 'cancelled') {
-      const button = document.createElement('button');
-      button.className = 'link';
-      button.textContent = 'Cancel';
-      button.addEventListener('click', async () => {
-        await fetch(`/api/appointments/${a.id}/cancel`, { method: 'POST' });
-        refresh();
-      });
-      action.append(button);
+      action.append(
+        linkButton('Cancel', async () => {
+          if (await attempt(() => api(`/api/appointments/${a.id}/cancel`, { method: 'POST' }))) refresh();
+        }),
+      );
     }
     tr.append(action);
     rows.append(tr);
@@ -62,7 +109,7 @@ function render(appointments) {
 function renderThread(messages) {
   thread.replaceChildren();
   const mine = messages.filter((m) => m.phone === selectedPhone);
-  hint.textContent = selectedPhone ? `Showing ${selectedPhone}` : 'Book an appointment, then open its phone.';
+  hint.textContent = selectedPhone ? `Showing ${selectedPhone}` : 'Book an appointment to start.';
 
   if (mine.length === 0) {
     const none = document.createElement('p');
@@ -88,10 +135,10 @@ function renderThread(messages) {
 
     if (m.status === 'scheduled') {
       const release = document.createElement('button');
+      release.type = 'button';
       release.textContent = 'Deliver now';
       release.addEventListener('click', async () => {
-        await fetch(`/api/demo/messages/${m.id}/release`, { method: 'POST' });
-        refresh();
+        if (await attempt(() => api(`/api/demo/messages/${m.id}/release`, { method: 'POST' }))) refresh();
       });
       bubble.append(release);
     }
@@ -100,55 +147,62 @@ function renderThread(messages) {
   thread.scrollTop = thread.scrollHeight;
 }
 
-async function loadThread() {
-  if (!demo) return;
-  renderThread(await (await fetch('/api/demo/messages')).json());
-}
-
 async function refresh() {
-  const appointments = await (await fetch('/api/appointments')).json();
-  if (demo && !selectedPhone && appointments.length > 0) {
-    selectedPhone = appointments.at(-1).phone;
+  try {
+    const appointments = await api('/api/appointments');
+    if (demo && !selectedPhone && appointments.length > 0) {
+      selectedPhone = appointments.at(-1).phone;
+    }
+    render(appointments);
+    if (demo) renderThread(await api('/api/demo/messages'));
+  } catch (err) {
+    showError(err.message);
   }
-  render(appointments);
-  await loadThread();
 }
 
 async function sendReply(text) {
-  if (!selectedPhone) return;
-  await fetch('/api/demo/replies', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phone: selectedPhone, text }),
-  });
-  await refresh();
+  if (!selectedPhone) {
+    showError('Book an appointment first, then reply as that customer.');
+    return;
+  }
+  if (await attempt(() => api('/api/demo/replies', { method: 'POST', body: JSON.stringify({ phone: selectedPhone, text }) }))) {
+    refresh();
+  }
+}
+
+function setDefaultStart() {
+  const start = new Date(Date.now() + 2 * 86_400_000);
+  start.setMinutes(0, 0, 0);
+  start.setMinutes(start.getMinutes() - start.getTimezoneOffset());
+  form.elements.startsAt.value = start.toISOString().slice(0, 16);
 }
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
-  error.hidden = true;
-
   const data = new FormData(form);
-  const response = await fetch('/api/appointments', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      name: data.get('name'),
-      phone: data.get('phone'),
-      startsAt: new Date(data.get('startsAt')).toISOString(),
-    }),
-  });
-
-  if (!response.ok) {
-    const body = await response.json();
-    error.textContent = body.detail ?? body.error;
-    error.hidden = false;
+  const startsAt = new Date(data.get('startsAt'));
+  if (Number.isNaN(startsAt.getTime())) {
+    showError('Pick a valid appointment date and time.');
     return;
   }
-  selectedPhone = data.get('phone');
-  form.reset();
-  setDefaultStart();
-  refresh();
+
+  submit.disabled = true;
+  submit.textContent = 'Booking...';
+  const ok = await attempt(() =>
+    api('/api/appointments', {
+      method: 'POST',
+      body: JSON.stringify({ name: data.get('name'), phone: data.get('phone').trim(), startsAt: startsAt.toISOString() }),
+    }),
+  );
+  submit.disabled = false;
+  submit.textContent = 'Book';
+
+  if (ok) {
+    selectedPhone = data.get('phone').trim();
+    form.reset();
+    setDefaultStart();
+    refresh();
+  }
 });
 
 reply.addEventListener('submit', (event) => {
@@ -162,18 +216,19 @@ for (const button of document.querySelectorAll('.quick button')) {
   button.addEventListener('click', () => sendReply(button.dataset.text));
 }
 
-function setDefaultStart() {
-  const start = new Date(Date.now() + 2 * 86_400_000);
-  start.setMinutes(0, 0, 0);
-  start.setMinutes(start.getMinutes() - start.getTimezoneOffset());
-  form.elements.startsAt.value = start.toISOString().slice(0, 16);
-}
-
 async function init() {
-  demo = (await (await fetch('/api/config')).json()).demo;
-  document.getElementById('banner').hidden = !demo;
-  phonePanel.hidden = !demo;
   setDefaultStart();
+  try {
+    const config = await api('/api/config');
+    demo = config.demo;
+    document.getElementById('banner').hidden = !demo && !config.sandbox;
+    document.getElementById('banner').textContent = demo
+      ? 'Demo mode: Sent is simulated locally. Nothing is sent to a real phone.'
+      : 'Sandbox mode: requests are validated by Sent but nothing is delivered.';
+    phonePanel.hidden = !demo;
+  } catch (err) {
+    showError(err.message);
+  }
   await refresh();
   setInterval(refresh, 4000);
 }

@@ -7,7 +7,8 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div id="banner" hidden>Demo mode: Sent is simulated locally. Nothing is sent to a real phone.</div>
+  <div id="banner" hidden></div>
+  <div id="toast" role="alert" hidden></div>
   <div class="layout">
     <main>
       <header>
@@ -20,7 +21,7 @@
         <label>Phone <input name="phone" placeholder="+14155551234" required autocomplete="off"></label>
         <label>Starts at <input name="startsAt" type="datetime-local" required></label>
         <button type="submit">Book</button>
-        <p id="error" role="alert" hidden></p>
+        
       </form>
 
       <table>

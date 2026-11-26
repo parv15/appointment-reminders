@@ -59,21 +59,48 @@ Real mode is the same flow with your Sent account. See [Setup](#setup).
 ## Requirements
 
 - Node.js 22.13 or later
-- A Sent account and API key
+- A Sent account and API key. Light onboarding is enough to start
 - An approved reminder template (below)
-- A public HTTPS URL for webhooks. Use a tunnel such as ngrok while developing
+- A public HTTPS URL for webhooks, only needed to receive replies and delivery updates. Use a tunnel such as ngrok while developing
+
+Built on [`@sentdm/sentdm`](https://www.npmjs.com/package/@sentdm/sentdm) 0.55, the official TypeScript SDK, with Express 5 as in Sent's Express guide.
 
 ## Setup
 
 ### 1. Create the template
 
-In the Sent dashboard, create a template named `appointment_reminder` with three variables and submit it for review:
+Create a template named `appointment_reminder_reply` and submit it for review. Through the API:
 
-```
-Hi {{name}}, this is a reminder of your appointment on {{date}} at {{time}}. Reply C to confirm or R to reschedule.
+```bash
+curl -X POST https://api.sent.dm/v3/templates \
+  -H "x-api-key: $SENT_DM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "appointment_reminder_reply",
+    "category": "UTILITY",
+    "language": "en_US",
+    "submit_for_review": true,
+    "definition": {
+      "body": {
+        "multiChannel": {
+          "type": "text",
+          "template": "Hello {{0:variable}},\n\nThis is a reminder about your upcoming appointment with {{1:variable}} on {{2:variable}} at {{3:variable}}.\n\nReply C to confirm or R to reschedule.",
+          "variables": [
+            { "id": 0, "name": "customer_name", "type": "variable", "props": { "variableType": "text", "sample": "John" } },
+            { "id": 1, "name": "business_name", "type": "variable", "props": { "variableType": "text", "sample": "Fashion Styles" } },
+            { "id": 2, "name": "appointment_date", "type": "variable", "props": { "variableType": "text", "sample": "December 31, 2025" } },
+            { "id": 3, "name": "appointment_time", "type": "variable", "props": { "variableType": "text", "sample": "1:00 PM" } }
+          ]
+        }
+      },
+      "definitionVersion": "1.0"
+    }
+  }'
 ```
 
-WhatsApp templates go through Meta review and RCS templates through the RCS sender profile. Sent reports approval changes by webhook.
+WhatsApp templates go through Meta review and RCS templates through the RCS sender profile. The app warns at startup while the template is not `APPROVED`.
+
+Want to start before approval? Every Sent account has the approved template `sent_Appointment_Reminder_2`, which takes the same four variables. Set `SENT_TEMPLATE_NAME=sent_Appointment_Reminder_2`. It has no "Reply C or R" line, so customers will not know to reply.
 
 ### 2. Configure
 
@@ -85,13 +112,16 @@ cp .env.example .env
 | Variable | Default | Description |
 | --- | --- | --- |
 | `SENT_DM_API_KEY` | required | API key from the Sent dashboard |
-| `SENT_DM_WEBHOOK_SECRET` | required | Signing secret returned when you register the webhook |
-| `SENT_TEMPLATE_NAME` | `appointment_reminder` | Template used for reminders |
+| `BUSINESS_NAME` | required | Business name shown in the reminder, for example `Acme Dental` |
+| `SENT_DM_WEBHOOK_SECRET` | empty | Signing secret from step 3. Without it, replies and delivery updates are ignored |
+| `SENT_TEMPLATE_NAME` | `appointment_reminder_reply` | Template used for reminders |
 | `REMINDER_LEAD_MINUTES` | `1440` | How long before the appointment the reminder goes out |
 | `BUSINESS_TIMEZONE` | `UTC` | IANA timezone used to format the date and time in messages |
 | `SENT_SANDBOX` | `false` | Validate requests without sending anything |
 | `PORT` | `3000` | HTTP port |
 | `DATABASE_PATH` | `./data/appointments.db` | SQLite file |
+
+Start with `SENT_SANDBOX=true`. The app validates every request against the real Sent API, so wrong phone formats, missing templates and bad keys show up without sending anything.
 
 ### 3. Register the webhook
 
@@ -155,6 +185,8 @@ curl -X POST http://localhost:3000/api/appointments \
 src/
   app.ts         HTTP routes and webhook endpoint
   reminders.ts   booking, cancelling and reply logic
+  config.ts      environment validation
+  errors.ts      Sent API errors turned into readable messages
   messenger.ts   thin wrapper over the Sent SDK
   demo.ts        local Sent simulator for demo mode
   signature.ts   webhook signature verification
@@ -163,6 +195,19 @@ src/
   server.ts      entry point
 public/          booking UI
 ```
+
+## Troubleshooting
+
+| Message | Cause and fix |
+| --- | --- |
+| `Cannot start, fix the configuration` | A variable is missing or invalid. Each problem is listed. Check `.env` against `.env.example` |
+| `Sent rejected the API key` | `SENT_DM_API_KEY` is wrong or revoked. Create a key in the dashboard |
+| `Template ... was not found` / `is PENDING` | The template does not exist or is not approved yet. Create it (step 1) or use `sent_Appointment_Reminder_2` |
+| `Sent could not find the template` when booking | Same cause, `SENT_TEMPLATE_NAME` does not match a template on the account |
+| `Sent rejected the request: Invalid phone number format` | Use E.164, for example `+14155551234` |
+| Reminders send but replies and statuses never update | `SENT_DM_WEBHOOK_SECRET` is unset, or the webhook URL is not reachable. Re-check step 3 |
+| Webhook returns 401 | Wrong signing secret, or the server clock is more than five minutes off |
+| `Port 3000 is already in use` | Set `PORT` to another value |
 
 ## License
 

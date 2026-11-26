@@ -14,8 +14,13 @@ export interface Messenger {
   cancel(messageId: string): Promise<void>;
 }
 
-export function createSentMessenger(sandbox: boolean): Messenger {
+export interface SentMessenger extends Messenger {
+  verify(): Promise<string[]>;
+}
+
+export function createSentMessenger(options: { sandbox: boolean; templateName: string }): SentMessenger {
   const client = new SentDm();
+  const { sandbox, templateName } = options;
 
   return {
     async send(request) {
@@ -43,6 +48,27 @@ export function createSentMessenger(sandbox: boolean): Messenger {
           throw err;
         }
       }
+    },
+
+    async verify() {
+      const warnings: string[] = [];
+      let template: { status?: string } | undefined;
+
+      for (let page = 1; page <= 20 && !template; page++) {
+        const response = await client.templates.list({ page, page_size: 100 });
+        template = response.data?.templates?.find((t) => t.name === templateName);
+        if (!response.data?.pagination?.has_more) break;
+      }
+
+      if (!template) {
+        warnings.push(`Template "${templateName}" was not found on your Sent account. Create it or set SENT_TEMPLATE_NAME.`);
+      } else if (template.status !== 'APPROVED') {
+        warnings.push(`Template "${templateName}" is ${template.status}. Live reminders are blocked until it is APPROVED.`);
+      }
+      if (sandbox) {
+        warnings.push('SENT_SANDBOX is true: requests are validated but nothing is delivered.');
+      }
+      return warnings;
     },
   };
 }

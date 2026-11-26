@@ -18,10 +18,10 @@ export class DemoMessenger implements Messenger {
   constructor(private readonly onStatus: (messageId: string, status: string) => void) {}
 
   async send(request: SendRequest): Promise<string> {
-    const { parameters } = request.template ?? {};
+    const p = request.template?.parameters;
     const body =
       request.text ??
-      `Hi ${parameters?.name}, this is a reminder of your appointment on ${parameters?.date} at ${parameters?.time}. Reply C to confirm or R to reschedule.`;
+      `Hello ${p?.customer_name}, this is a reminder about your upcoming appointment with ${p?.business_name} on ${p?.appointment_date} at ${p?.appointment_time}. Reply C to confirm or R to reschedule.`;
     const scheduled = request.scheduledAt !== undefined;
     const message: DemoMessage = {
       id: randomUUID(),

@@ -8,7 +8,7 @@ export function verifyWebhook(
   secret: string,
   nowSeconds = Date.now() / 1000,
 ): boolean {
-  if (!headers.id || !headers.timestamp || !headers.signature) {
+  if (!secret || !headers.id || !headers.timestamp || !headers.signature) {
     return false;
   }
   if (Math.abs(nowSeconds - Number(headers.timestamp)) > REPLAY_WINDOW_SECONDS) {

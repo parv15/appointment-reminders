@@ -37,3 +37,9 @@ aside h2 { margin: 0; font-size: 15px; }
 .quick button { background: var(--border); color: inherit; padding: 4px 12px; }
 #phone-hint { margin: 0; font-size: 12px; opacity: .6; }
 .thread-empty { opacity: .5; font-size: 13px; }
+#toast { position: fixed; top: 52px; left: 50%; transform: translateX(-50%); max-width: 560px; padding: 10px 16px; border-radius: 8px; background: #dc2626; color: #fff; font-size: 14px; z-index: 10; }
+.pill.failed, .pill.blocked { background: #dc262633; }
+.pill.delivered, .pill.sent { background: #16a34a33; }
+.pill.scheduled, .pill.queued { background: #2563eb33; }
+button:disabled { opacity: .6; cursor: progress; }
+[hidden] { display: none !important; }

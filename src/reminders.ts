@@ -8,17 +8,17 @@ const MAX_SCHEDULE_AHEAD_MS = 30 * 24 * 60 * 60_000;
 
 export class ValidationError extends Error {}
 
+export interface InboundPayload {
+  inbound_number: string;
+  channel: string;
+  text?: string | null;
+}
+
 export interface Reminders {
   book(input: { name: string; phone: string; startsAt: string }): Promise<Appointment>;
   cancel(id: string): Promise<Appointment | undefined>;
   handleInbound(payload: InboundPayload): Promise<void>;
   handleStatus(event: string, payload: { message_id?: string }): void;
-}
-
-export interface InboundPayload {
-  inbound_number: string;
-  channel: string;
-  text?: string | null;
 }
 
 export function createReminders(deps: { store: Store; messenger: Messenger; config: Config; now?: () => Date }): Reminders {
@@ -27,15 +27,14 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
 
   const format = (startsAt: string) => {
     const date = new Date(startsAt);
-    const options = { timeZone: config.timezone };
+    const clean = (value: string) => value.replace(/[\u202f\u00a0]/g, ' ');
     return {
-      date: new Intl.DateTimeFormat('en-US', { ...options, dateStyle: 'medium' }).format(date),
-      time: new Intl.DateTimeFormat('en-US', { ...options, timeStyle: 'short' }).format(date),
+      date: clean(new Intl.DateTimeFormat('en-US', { timeZone: config.timezone, dateStyle: 'medium' }).format(date)),
+      time: clean(new Intl.DateTimeFormat('en-US', { timeZone: config.timezone, timeStyle: 'short' }).format(date)),
     };
   };
 
-  const reply = (to: string, channel: string, text: string) =>
-    messenger.send({ to, channel, text });
+  const reply = (to: string, channel: string, text: string) => messenger.send({ to, channel, text });
 
   return {
     async book({ name, phone, startsAt }) {
@@ -43,10 +42,10 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
       const sendAt = start.getTime() - config.reminderLeadMinutes * 60_000;
       const current = now().getTime();
       if (start.getTime() <= current) {
-        throw new ValidationError('startsAt must be in the future');
+        throw new ValidationError('The appointment time must be in the future.');
       }
       if (sendAt - current > MAX_SCHEDULE_AHEAD_MS) {
-        throw new ValidationError('Reminders can be scheduled at most 30 days ahead');
+        throw new ValidationError('Reminders can be scheduled at most 30 days ahead. Pick a sooner appointment time.');
       }
 
       const appointment = store.create({ name, phone, startsAt });
@@ -56,13 +55,21 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
       try {
         const messageId = await messenger.send({
           to: phone,
-          template: { name: config.templateName, parameters: { name, date, time } },
+          template: {
+            name: config.templateName,
+            parameters: {
+              customer_name: name,
+              business_name: config.businessName,
+              appointment_date: date,
+              appointment_time: time,
+            },
+          },
           ...(scheduleLater && { scheduledAt: new Date(sendAt) }),
           idempotencyKey: `reminder-${appointment.id}`,
         });
         store.setReminder(appointment.id, messageId);
       } catch (err) {
-        store.setStatus(appointment.id, 'cancelled');
+        store.delete(appointment.id);
         throw err;
       }
       return store.get(appointment.id)!;

@@ -1,10 +1,10 @@
-import SentDm from '@sentdm/sentdm';
 import express, { type ErrorRequestHandler } from 'express';
 import { fileURLToPath } from 'node:url';
 import type { Config } from './config.js';
+import type { DemoMessenger } from './demo.js';
+import { explainSentError } from './errors.js';
 import { ValidationError, type Reminders } from './reminders.js';
 import { verifyWebhook } from './signature.js';
-import type { DemoMessenger } from './demo.js';
 import type { Store } from './store.js';
 
 const E164 = /^\+[1-9]\d{6,14}$/;
@@ -18,6 +18,10 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
   const app = express();
 
   app.post('/webhooks/sent', express.raw({ type: 'application/json' }), async (req, res) => {
+    if (!config.webhookSecret) {
+      res.status(503).json({ error: 'SENT_DM_WEBHOOK_SECRET is not configured, so webhooks cannot be verified.' });
+      return;
+    }
     const verified = verifyWebhook(
       req.body,
       { id: header(req, 'id'), timestamp: header(req, 'timestamp'), signature: header(req, 'signature') },
@@ -32,16 +36,17 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
 
     if (!store.markEventSeen(header(req, 'id'))) return;
 
-    const event = JSON.parse(req.body.toString('utf8'));
-    if (event.field !== 'message') return;
     try {
+      const event = JSON.parse(req.body.toString('utf8'));
+      if (event.field !== 'message') return;
       if (event.event === 'message.received') {
         await reminders.handleInbound(event.payload);
       } else {
         reminders.handleStatus(event.event, event.payload ?? {});
       }
     } catch (err) {
-      console.error('webhook processing failed', err);
+      const explained = explainSentError(err);
+      console.error(`Webhook ${header(req, 'id')} failed: ${explained?.message ?? (err instanceof Error ? err.message : err)}`);
     }
   });
 
@@ -53,7 +58,7 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
   });
 
   app.get('/api/config', (_req, res) => {
-    res.json({ demo: demo !== undefined });
+    res.json({ demo: demo !== undefined, sandbox: config.sandbox });
   });
 
   if (demo) {
@@ -63,7 +68,7 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
 
     app.post('/api/demo/messages/:id/release', (req, res) => {
       if (!demo.release(req.params.id)) {
-        res.status(404).json({ error: 'No scheduled message with that id' });
+        res.status(404).json({ error: 'That message is not waiting to be delivered.' });
         return;
       }
       res.json({ released: true });
@@ -72,7 +77,7 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
     app.post('/api/demo/replies', async (req, res) => {
       const { phone, text } = req.body ?? {};
       if (typeof phone !== 'string' || typeof text !== 'string' || !text.trim()) {
-        throw new ValidationError('phone and text are required');
+        throw new ValidationError('Pick an appointment and type a reply.');
       }
       demo.recordInbound(phone, text);
       await reminders.handleInbound({ inbound_number: phone, channel: 'sms', text });
@@ -86,10 +91,12 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
 
   app.post('/api/appointments', async (req, res) => {
     const { name, phone, startsAt } = req.body ?? {};
-    if (typeof name !== 'string' || !name.trim()) throw new ValidationError('name is required');
-    if (typeof phone !== 'string' || !E164.test(phone)) throw new ValidationError('phone must be E.164, for example +14155551234');
+    if (typeof name !== 'string' || !name.trim()) throw new ValidationError('Enter the customer name.');
+    if (typeof phone !== 'string' || !E164.test(phone)) {
+      throw new ValidationError('Enter the phone number in international format, for example +14155551234.');
+    }
     if (typeof startsAt !== 'string' || !ISO_WITH_OFFSET.test(startsAt) || Number.isNaN(Date.parse(startsAt))) {
-      throw new ValidationError('startsAt must be ISO-8601 with a UTC offset');
+      throw new ValidationError('Pick a valid appointment date and time.');
     }
     res.status(201).json(await reminders.book({ name: name.trim(), phone, startsAt }));
   });
@@ -97,21 +104,33 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
   app.post('/api/appointments/:id/cancel', async (req, res) => {
     const appointment = await reminders.cancel(req.params.id);
     if (!appointment) {
-      res.status(404).json({ error: 'Appointment not found' });
+      res.status(404).json({ error: 'Appointment not found.' });
       return;
     }
     res.json(appointment);
   });
 
+  app.use('/api', (_req, res) => {
+    res.status(404).json({ error: 'Not found.' });
+  });
+
   const onError: ErrorRequestHandler = (err, _req, res, _next) => {
     if (err instanceof ValidationError) {
       res.status(400).json({ error: err.message });
-    } else if (err instanceof SentDm.APIError) {
-      res.status(502).json({ error: 'Sent rejected the request', status: err.status, detail: err.message });
-    } else {
-      console.error(err);
-      res.status(500).json({ error: 'Internal error' });
+      return;
     }
+    if (err instanceof SyntaxError && 'body' in err) {
+      res.status(400).json({ error: 'The request body is not valid JSON.' });
+      return;
+    }
+    const explained = explainSentError(err);
+    if (explained) {
+      console.error(`Sent error ${explained.code ?? ''} ${explained.requestId ?? ''}: ${explained.message}`);
+      res.status(explained.status).json({ error: explained.message, requestId: explained.requestId });
+      return;
+    }
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong on the server. Check the server log.' });
   };
   app.use(onError);
 
