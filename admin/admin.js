@@ -147,7 +147,7 @@ function renderNotice(templates) {
   if (config.repliesPossible === false) {
     parts.push(
       el('strong', '', 'Customers cannot reply to your texts yet'),
-      el('span', '', 'Your Sent account has no SMS number, WhatsApp or RCS channel of its own, so texts go out one way. Set up a channel in the Sent dashboard before you rely on C and R replies.'),
+      el('span', '', 'Your Sent account only has a sender ID that sends one way, or no sender at all. Add an SMS number, WhatsApp or RCS in the Sent dashboard before you rely on C and R replies.'),
     );
   }
   if (stale.length > 0) {

@@ -105,7 +105,7 @@ The dashboard sits behind a sign-in page with a password. Two setup scripts crea
 
 ## Prerequisites
 
-You need Node.js 22.13 or later and a [Sent](https://app.sent.dm) account with an API key. To receive customer replies, the account also needs a channel of its own with a number that can receive messages, which means an SMS number, WhatsApp or RCS, set up in the Sent dashboard. Light onboarding is enough to start, because its approved templates are what the app uses until yours are approved. Replies need a public HTTPS address for the webhook, and a tunnel such as [ngrok](https://ngrok.com) provides one while you develop.
+You need Node.js 22.13 or later and a [Sent](https://app.sent.dm) account with an API key. To receive customer replies, the account also needs a channel that can receive messages, which means an SMS number, WhatsApp or RCS, set up in the Sent dashboard. An alphanumeric sender ID, which shows a brand name instead of a number, only sends and cannot receive. Light onboarding is enough to start, because its approved templates are what the app uses until yours are approved. Replies need a public HTTPS address for the webhook, and a tunnel such as [ngrok](https://ngrok.com) provides one while you develop.
 
 ## Quick start
 
@@ -281,7 +281,7 @@ try {
 | Your own templates are not approved | Sent's approved templates are used, and the dashboard says so. |
 | No template is approved at all | Startup warns you and Sent blocks the text, but the booking is not affected. |
 | Sent rejects the API key | The app refuses to start and names the variable to fix. |
-| The Sent account has no SMS number, WhatsApp or RCS channel | Texts still go out, but they are one way and customers cannot reply. The app warns at startup, shows a notice on the dashboard and hides the reply instructions on the booking page. |
+| The Sent account has no channel that can receive replies, such as only an alphanumeric sender ID | Texts still go out, but they are one way and customers cannot reply. The app warns at startup, shows a notice on the dashboard and hides the reply instructions on the booking page. |
 | The webhook secret is missing | The webhook answers 503 and replies are ignored. Texts still go out and their status is polled. |
 | The same webhook arrives twice | The event id is stored, so the event is processed once. |
 | A customer replies after the appointment | The reply is ignored, because replies only apply to upcoming appointments. |
@@ -421,7 +421,7 @@ Yes. Edit the JSON files in [`docs/templates`](docs/templates), create new templ
 
 **Why can the customer not reply to the text?**
 
-On a Sent account without its own SMS number, WhatsApp or RCS channel, messages leave through a shared one-way route and replies have nowhere to go. Set up a channel in the Sent dashboard. The app checks this on startup, and the dashboard shows a notice until a channel exists.
+A sender ID that shows a brand name, or the shared route that accounts without a channel use, can only send. Replies need an SMS number, WhatsApp or RCS, which you add in the Sent dashboard. The app checks this on startup, and the dashboard shows a notice until a channel exists.
 
 **Does it work without a webhook?**
 

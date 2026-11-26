@@ -136,7 +136,7 @@ export function createSentMessenger(options: { sandbox: boolean; templates: Temp
       if (sandbox) return true;
       if (twoWayCache && Date.now() - twoWayCache.at < STATUS_TTL_MS) return twoWayCache.value;
       const channels = (await client.channels.list()).data;
-      const value = Boolean(channels?.sms?.length || channels?.whatsapp || channels?.rcs);
+      const value = Boolean(channels?.sms?.some((market) => market.number_type !== 'ALPHANUMERIC' && market.numbers?.length) || channels?.whatsapp || channels?.rcs);
       twoWayCache = { value, at: Date.now() };
       return value;
     },
@@ -158,7 +158,7 @@ export function createSentMessenger(options: { sandbox: boolean; templates: Temp
         }
       }
       if (!(await this.twoWay().catch(() => true))) {
-        warnings.push('Your Sent account has no SMS number, WhatsApp or RCS channel of its own. Texts are sent one way and customers cannot reply, so C and R replies will not arrive until you set up a channel in the Sent dashboard.');
+        warnings.push('Your Sent account has no channel that can receive replies. An alphanumeric sender ID such as a brand name sends one way, so C and R replies will not arrive until you add an SMS number, WhatsApp or RCS in the Sent dashboard.');
       }
       if (sandbox) {
         warnings.push('SENT_SANDBOX is true: requests are validated but nothing is delivered.');
