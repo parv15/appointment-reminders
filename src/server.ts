@@ -54,6 +54,9 @@ if (demo) {
 }
 
 const reminders = createReminders({ store, messenger, config });
+if (!config.adminPassword && !config.demo) {
+  console.warn('Warning: ADMIN_PASSWORD is not set, so /admin is open to anyone who can reach this server.');
+}
 const server = createApp({ store, reminders, config, demo }).listen(config.port, (err?: NodeJS.ErrnoException) => {
   if (err) {
     fail(err.code === 'EADDRINUSE' ? `Port ${config.port} is already in use. Set PORT to another value.` : `Cannot listen on port ${config.port}: ${err.message}`);

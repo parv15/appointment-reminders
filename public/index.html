@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Appointment reminders</title>
+  <title>Book an appointment</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232563eb'/%3E%3Cpath d='M9 17l5 5 9-11' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <div id="toast" role="alert" hidden></div>
@@ -16,113 +16,90 @@
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>
       </span>
       <div>
-        <h1>Appointment reminders</h1>
-        <p>Reminders out, replies in, statuses updated.</p>
+        <h1 id="business">Book an appointment</h1>
+        <p>Online booking</p>
       </div>
     </div>
     <span id="mode" class="mode" hidden></span>
   </header>
 
-  <div class="shell" id="shell">
-    <main>
-      <section class="stats" aria-label="Summary">
-        <div class="stat"><span id="stat-upcoming">0</span><label>Upcoming</label></div>
-        <div class="stat good"><span id="stat-confirmed">0</span><label>Confirmed</label></div>
-        <div class="stat warn"><span id="stat-reschedule">0</span><label>Need a new time</label></div>
-        <div class="stat muted"><span id="stat-cancelled">0</span><label>Cancelled</label></div>
-      </section>
+  <main class="portal">
+    <ol class="steps" id="steps" aria-label="Progress">
+      <li class="current" data-step="1"><span>1</span>Service and time</li>
+      <li data-step="2"><span>2</span>Your details</li>
+      <li data-step="3"><span>3</span>Confirmed</li>
+    </ol>
 
-      <ol class="steps" id="steps" aria-label="Progress">
-        <li class="current" data-step="1"><span>1</span>Appointment</li>
-        <li data-step="2"><span>2</span>Booked</li>
-        <li data-step="3"><span>3</span>Alert delivered</li>
-      </ol>
+    <section class="card" id="step-1">
+      <h2>Choose a service</h2>
+      <div id="services" class="chips" role="radiogroup" aria-label="Service"></div>
 
-      <section class="card" id="booked" hidden>
-        <div class="booked-head">
-          <span class="check" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>
+      <h2 class="spaced">Pick a day</h2>
+      <div id="days" class="days"></div>
+
+      <h2 class="spaced">Pick a time <small id="tz-note"></small></h2>
+      <div id="slots" class="slots"></div>
+      <p id="no-slots" class="muted" hidden>No times left on this day. Try another day.</p>
+
+      <div class="nav"><span></span><button type="button" class="primary" id="to-details" disabled>Continue</button></div>
+    </section>
+
+    <section class="card" id="step-2" hidden>
+      <h2>Your details</h2>
+      <div class="summary" id="summary"></div>
+      <form id="details">
+        <label>Full name
+          <input name="name" placeholder="Ada Lovelace" required autocomplete="name">
+        </label>
+        <label>Mobile number
+          <span class="phone-field">
+            <select name="code" aria-label="Country code"></select>
+            <input name="number" placeholder="98765 43210" required autocomplete="tel-national" inputmode="tel">
           </span>
-          <div>
-            <h2>Appointment booked</h2>
-            <p id="booked-sub"></p>
-          </div>
+          <small>We text your booking confirmation and a reminder to this number.</small>
+        </label>
+        <div class="nav">
+          <button type="button" class="ghost" id="back">Back</button>
+          <button type="submit" class="primary">Confirm booking</button>
         </div>
-        <dl class="details">
-          <div><dt>Customer</dt><dd id="d-name"></dd></div>
-          <div><dt>Mobile</dt><dd id="d-phone"></dd></div>
-          <div><dt>When</dt><dd id="d-when"></dd></div>
-          <div><dt>Reminder</dt><dd id="d-reminder"></dd></div>
-        </dl>
-        <div class="alert-box">
-          <div class="alert-title">
-            <strong>Alert to customer</strong>
-            <span id="alert-chip" class="pill queued">queued</span>
-          </div>
-          <div class="sms" id="alert-text"></div>
-          <ol class="track" id="track">
-            <li data-s="queued">Queued</li>
-            <li data-s="sent">Sent</li>
-            <li data-s="delivered">Delivered</li>
-          </ol>
-          <p id="alert-error" class="alert-error" hidden></p>
-        </div>
-        <button type="button" class="primary" id="book-another">Book another appointment</button>
-      </section>
+      </form>
+    </section>
 
-      <section class="card" id="form-card">
-        <h2>Book an appointment</h2>
-        <form id="booking">
-          <label>Customer name
-            <input name="name" placeholder="Ada Lovelace" required autocomplete="off">
-          </label>
-          <label>Mobile number
-            <input name="phone" placeholder="+14155551234" required autocomplete="off" inputmode="tel">
-            <small>International format with country code</small>
-          </label>
-          <label>Appointment
-            <input name="startsAt" type="datetime-local" required>
-            <small id="lead-hint"></small>
-          </label>
-          <button type="submit" class="primary">Book and schedule reminder</button>
-        </form>
-      </section>
-
-      <section class="card">
-        <h2>Appointments</h2>
-        <ul id="list" class="list"></ul>
-        <div id="empty" class="empty" hidden>
-          <strong>No appointments yet</strong>
-          <span>Book one above. The reminder is scheduled with Sent automatically.</span>
+    <section class="card" id="step-3" hidden>
+      <div class="booked-head">
+        <span class="check" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>
+        </span>
+        <div>
+          <h2>You are booked</h2>
+          <p id="booked-sub"></p>
         </div>
-      </section>
-    </main>
-
-    <aside id="phone" hidden>
-      <div class="device">
-        <div class="device-bar">
-          <span class="avatar" id="phone-avatar">?</span>
-          <div>
-            <strong id="phone-name">Customer phone</strong>
-            <small id="phone-number">Book an appointment to start</small>
-          </div>
-        </div>
-        <div id="thread" class="thread"></div>
-        <div class="quick">
-          <button type="button" data-text="C">C</button>
-          <button type="button" data-text="R">R</button>
-          <button type="button" data-text="STOP">STOP</button>
-          <button type="button" data-text="hello">hello</button>
-        </div>
-        <form id="reply">
-          <input name="text" placeholder="Text message" autocomplete="off" required>
-          <button type="submit" aria-label="Send">&uarr;</button>
-        </form>
       </div>
-      <p class="aside-note">Simulated customer. Replies go through the same code a real Sent webhook uses.</p>
-    </aside>
-  </div>
+      <dl class="details">
+        <div><dt>Service</dt><dd id="d-service"></dd></div>
+        <div><dt>Name</dt><dd id="d-name"></dd></div>
+        <div><dt>When</dt><dd id="d-when"></dd></div>
+        <div><dt>Mobile</dt><dd id="d-phone"></dd></div>
+      </dl>
+      <div class="alert-box" id="alert-box">
+        <div class="alert-title">
+          <strong>Text message sent to you</strong>
+          <span id="alert-chip" class="pill queued">queued</span>
+        </div>
+        <div class="sms" id="alert-text"></div>
+        <ol class="track" id="track">
+          <li>Queued</li>
+          <li>Sent</li>
+          <li>Delivered</li>
+        </ol>
+        <p id="alert-error" class="alert-error" hidden></p>
+      </div>
+      <p class="muted" id="reminder-note"></p>
+      <button type="button" class="primary" id="book-another">Book another appointment</button>
+    </section>
+  </main>
 
-  <script src="app.js"></script>
+  <script src="/common.js"></script>
+  <script src="/portal.js"></script>
 </body>
 </html>

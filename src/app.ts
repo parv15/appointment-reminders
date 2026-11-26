@@ -1,21 +1,38 @@
 import express, { type ErrorRequestHandler } from 'express';
 import { fileURLToPath } from 'node:url';
+import { buildActivity } from './activity.js';
+import { adminAuth } from './auth.js';
 import type { Config } from './config.js';
 import type { DemoMessenger } from './demo.js';
 import { explainSentError } from './errors.js';
 import { ValidationError, type Reminders } from './reminders.js';
 import { verifyWebhook } from './signature.js';
-import type { Store } from './store.js';
+import { availableSlots, localDate } from './slots.js';
+import type { Appointment, Store } from './store.js';
 
 const E164 = /^\+[1-9]\d{6,14}$/;
-const ISO_WITH_OFFSET = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
+const NAME = /^\p{L}[\p{L} '’-]{1,29}$/u;
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const PUBLIC_DIR = fileURLToPath(new URL('../public', import.meta.url));
+const ADMIN_DIR = fileURLToPath(new URL('../admin', import.meta.url));
 
 const header = (req: express.Request, name: string) =>
   req.header(`webhook-${name}`) ?? req.header(`x-webhook-${name}`) ?? '';
 
+const publicView = (a: Appointment) => ({
+  id: a.id,
+  name: a.name,
+  service: a.service,
+  phone: a.phone,
+  startsAt: a.startsAt,
+  status: a.status,
+  alertStatus: a.confirmationMessageId ? (a.confirmationStatus ?? 'queued') : null,
+});
+
 export function createApp(deps: { store: Store; reminders: Reminders; config: Config; demo?: DemoMessenger }) {
   const { store, reminders, config, demo } = deps;
   const app = express();
+  const admin = adminAuth(config.adminPassword);
 
   app.post('/webhooks/sent', express.raw({ type: 'application/json' }), async (req, res) => {
     if (!config.webhookSecret) {
@@ -51,7 +68,8 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
   });
 
   app.use(express.json());
-  app.use(express.static(fileURLToPath(new URL('../public', import.meta.url))));
+  app.use('/admin', admin, express.static(ADMIN_DIR));
+  app.use(express.static(PUBLIC_DIR));
 
   app.get('/healthz', (_req, res) => {
     res.json({ ok: true });
@@ -61,20 +79,79 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
     res.json({
       demo: demo !== undefined,
       sandbox: config.sandbox,
-      reminderLeadMinutes: config.reminderLeadMinutes,
       businessName: config.businessName,
-      serviceName: config.serviceName,
+      services: config.services,
       timezone: config.timezone,
+      defaultCountryCode: config.defaultCountryCode,
+      reminderLeadMinutes: config.reminderLeadMinutes,
+      maxAdvanceDays: config.slotRules.maxAdvanceDays,
       confirmationAlerts: config.confirmationTemplateName !== '',
     });
   });
 
+  app.get('/api/slots', (req, res) => {
+    const date = String(req.query.date ?? '');
+    if (!DATE.test(date)) throw new ValidationError('Pick a valid date.');
+    const slots = availableSlots(date, config.slotRules, store.takenStarts(), new Date());
+    res.json({ date, slots: slots.map((s) => s.toISOString()) });
+  });
+
+  app.post('/api/bookings', async (req, res) => {
+    const { service, name, phone, startsAt } = req.body ?? {};
+    if (typeof service !== 'string' || !config.services.includes(service)) throw new ValidationError('Choose a service.');
+    if (typeof name !== 'string' || !NAME.test(name.trim())) {
+      throw new ValidationError('Enter your name using letters only (2 to 30 characters).');
+    }
+    if (typeof phone !== 'string' || !E164.test(phone)) {
+      throw new ValidationError('Enter a valid mobile number.');
+    }
+    const start = typeof startsAt === 'string' ? new Date(startsAt) : new Date(NaN);
+    if (Number.isNaN(start.getTime())) throw new ValidationError('Pick a date and time.');
+    const open = availableSlots(localDate(start, config.timezone), config.slotRules, store.takenStarts(), new Date());
+    if (!open.some((s) => s.getTime() === start.getTime())) {
+      throw new ValidationError('That time is no longer available. Please pick another slot.');
+    }
+
+    const booking = await reminders.book({ name: name.trim(), service, phone, startsAt: start.toISOString() });
+    res.status(201).json({ ...publicView(booking), ...(booking.confirmationError && { alertError: booking.confirmationError }) });
+  });
+
+  app.get('/api/bookings/:id', async (req, res) => {
+    await reminders.syncStatuses();
+    const booking = store.get(req.params.id);
+    if (!booking) {
+      res.status(404).json({ error: 'Booking not found.' });
+      return;
+    }
+    res.json(publicView(booking));
+  });
+
+  app.use('/api/admin', admin);
+
+  app.get('/api/admin/appointments', async (_req, res) => {
+    await reminders.syncStatuses();
+    res.json(store.list());
+  });
+
+  app.get('/api/admin/activity', (_req, res) => {
+    res.json(buildActivity(store.list(), config.reminderLeadMinutes));
+  });
+
+  app.post('/api/admin/appointments/:id/cancel', async (req, res) => {
+    const appointment = await reminders.cancel(req.params.id);
+    if (!appointment) {
+      res.status(404).json({ error: 'Appointment not found.' });
+      return;
+    }
+    res.json(appointment);
+  });
+
   if (demo) {
-    app.get('/api/demo/messages', (_req, res) => {
+    app.get('/api/admin/demo/messages', (_req, res) => {
       res.json(demo.list());
     });
 
-    app.post('/api/demo/messages/:id/release', (req, res) => {
+    app.post('/api/admin/demo/messages/:id/release', (req, res) => {
       if (!demo.release(req.params.id)) {
         res.status(404).json({ error: 'That message is not waiting to be delivered.' });
         return;
@@ -82,7 +159,7 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
       res.json({ released: true });
     });
 
-    app.post('/api/demo/replies', async (req, res) => {
+    app.post('/api/admin/demo/replies', async (req, res) => {
       const { phone, text } = req.body ?? {};
       if (typeof phone !== 'string' || typeof text !== 'string' || !text.trim()) {
         throw new ValidationError('Pick an appointment and type a reply.');
@@ -92,32 +169,6 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
       res.json({ received: true });
     });
   }
-
-  app.get('/api/appointments', async (_req, res) => {
-    await reminders.syncStatuses();
-    res.json(store.list());
-  });
-
-  app.post('/api/appointments', async (req, res) => {
-    const { name, phone, startsAt } = req.body ?? {};
-    if (typeof name !== 'string' || !name.trim()) throw new ValidationError('Enter the customer name.');
-    if (typeof phone !== 'string' || !E164.test(phone)) {
-      throw new ValidationError('Enter the phone number in international format, for example +14155551234.');
-    }
-    if (typeof startsAt !== 'string' || !ISO_WITH_OFFSET.test(startsAt) || Number.isNaN(Date.parse(startsAt))) {
-      throw new ValidationError('Pick a valid appointment date and time.');
-    }
-    res.status(201).json(await reminders.book({ name: name.trim(), phone, startsAt }));
-  });
-
-  app.post('/api/appointments/:id/cancel', async (req, res) => {
-    const appointment = await reminders.cancel(req.params.id);
-    if (!appointment) {
-      res.status(404).json({ error: 'Appointment not found.' });
-      return;
-    }
-    res.json(appointment);
-  });
 
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'Not found.' });

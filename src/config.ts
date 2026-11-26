@@ -1,3 +1,5 @@
+import type { SlotRules } from './slots.js';
+
 export interface Config {
   port: number;
   demo: boolean;
@@ -5,7 +7,10 @@ export interface Config {
   templateName: string;
   confirmationTemplateName: string;
   businessName: string;
-  serviceName: string;
+  services: string[];
+  defaultCountryCode: string;
+  adminPassword: string;
+  slotRules: SlotRules;
   reminderLeadMinutes: number;
   timezone: string;
   sandbox: boolean;
@@ -58,6 +63,21 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     problems.push(`BUSINESS_TIMEZONE "${timezone}" is not a valid IANA timezone, for example America/New_York`);
   }
 
+  const startHour = Number(env.BOOKING_START_HOUR ?? 9);
+  const endHour = Number(env.BOOKING_END_HOUR ?? 17);
+  const slotMinutes = Number(env.SLOT_MINUTES ?? 30);
+  if (!Number.isInteger(startHour) || !Number.isInteger(endHour) || startHour < 0 || endHour > 24 || startHour >= endHour) {
+    problems.push('BOOKING_START_HOUR and BOOKING_END_HOUR must be whole hours with the start before the end, for example 9 and 17');
+  }
+  if (![10, 15, 20, 30, 45, 60].includes(slotMinutes)) {
+    problems.push(`SLOT_MINUTES must be one of 10, 15, 20, 30, 45, 60, got "${env.SLOT_MINUTES}"`);
+  }
+
+  const services = (env.SERVICES ?? env.SERVICE_NAME ?? 'Appointment').split(',').map((s) => s.trim()).filter(Boolean);
+  if (services.length === 0) {
+    problems.push('SERVICES must list at least one service, for example "Dental checkup,Teeth cleaning"');
+  }
+
   if (problems.length > 0) {
     throw new ConfigError(problems);
   }
@@ -69,7 +89,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     templateName: env.SENT_TEMPLATE_NAME ?? 'appointment_reminder_reply',
     confirmationTemplateName: env.SENT_CONFIRMATION_TEMPLATE ?? 'sent_Appointment_Confirmation_1',
     businessName,
-    serviceName: env.SERVICE_NAME?.trim() || 'Appointment',
+    services,
+    defaultCountryCode: env.DEFAULT_COUNTRY_CODE ?? '+1',
+    adminPassword: env.ADMIN_PASSWORD ?? '',
+    slotRules: { timezone, startHour, endHour, slotMinutes, maxAdvanceDays: 14 },
     reminderLeadMinutes,
     timezone,
     sandbox: env.SENT_SANDBOX === 'true',

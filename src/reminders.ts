@@ -20,7 +20,7 @@ export interface InboundPayload {
 export type BookingResult = Appointment & { confirmationError?: string };
 
 export interface Reminders {
-  book(input: { name: string; phone: string; startsAt: string }): Promise<BookingResult>;
+  book(input: { name: string; service: string; phone: string; startsAt: string }): Promise<BookingResult>;
   syncStatuses(): Promise<void>;
   cancel(id: string): Promise<Appointment | undefined>;
   handleInbound(payload: InboundPayload): Promise<void>;
@@ -43,8 +43,9 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
   const reply = (to: string, channel: string, text: string) => messenger.send({ to, channel, text });
 
   return {
-    async book({ name, phone, startsAt }) {
-      const start = new Date(startsAt);
+    async book({ name, service, phone, startsAt: requestedStart }) {
+      const start = new Date(requestedStart);
+      const startsAt = start.toISOString();
       const sendAt = start.getTime() - config.reminderLeadMinutes * 60_000;
       const current = now().getTime();
       if (start.getTime() <= current) {
@@ -54,7 +55,10 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
         throw new ValidationError('Reminders can be scheduled at most 30 days ahead. Pick a sooner appointment time.');
       }
 
-      const appointment = store.create({ name, phone, startsAt });
+      if (store.takenStarts().has(startsAt)) {
+        throw new ValidationError('That time was just taken. Please pick another slot.');
+      }
+      const appointment = store.create({ name, service, phone, startsAt });
       const { date, time } = format(startsAt);
       const scheduleLater = sendAt - current >= MIN_SCHEDULE_AHEAD_MS;
       const baseParameters = { customer_name: name, business_name: config.businessName, appointment_date: date, appointment_time: time };
@@ -82,7 +86,7 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
             to: phone,
             template: {
               name: config.confirmationTemplateName,
-              parameters: { ...baseParameters, service_name: config.serviceName },
+              parameters: { ...baseParameters, service_name: service },
             },
             idempotencyKey: `confirmation-${appointment.id}`,
           });

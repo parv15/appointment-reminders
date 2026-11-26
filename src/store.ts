@@ -8,6 +8,7 @@ export type AppointmentStatus = 'scheduled' | 'confirmed' | 'reschedule_requeste
 export interface Appointment {
   id: string;
   name: string;
+  service: string;
   phone: string;
   startsAt: string;
   status: AppointmentStatus;
@@ -23,6 +24,7 @@ export interface Appointment {
 interface Row {
   id: string;
   name: string;
+  service: string | null;
   phone: string;
   starts_at: string;
   status: AppointmentStatus;
@@ -38,6 +40,7 @@ interface Row {
 const toAppointment = (row: Row): Appointment => ({
   id: row.id,
   name: row.name,
+  service: row.service ?? 'Appointment',
   phone: row.phone,
   startsAt: row.starts_at,
   status: row.status,
@@ -62,6 +65,7 @@ export class Store {
       CREATE TABLE IF NOT EXISTS appointments (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
+        service TEXT,
         phone TEXT NOT NULL,
         starts_at TEXT NOT NULL,
         status TEXT NOT NULL,
@@ -78,14 +82,14 @@ export class Store {
       CREATE TABLE IF NOT EXISTS seen_events (id TEXT PRIMARY KEY);
     `);
     const columns = (this.db.prepare('PRAGMA table_info(appointments)').all() as unknown as { name: string }[]).map((c) => c.name);
-    for (const column of ['last_reply', 'last_reply_at', 'confirmation_message_id', 'confirmation_status']) {
+    for (const column of ['service', 'last_reply', 'last_reply_at', 'confirmation_message_id', 'confirmation_status']) {
       if (!columns.includes(column)) {
         this.db.exec(`ALTER TABLE appointments ADD COLUMN ${column} TEXT`);
       }
     }
   }
 
-  create(input: { name: string; phone: string; startsAt: string }): Appointment {
+  create(input: { name: string; service: string; phone: string; startsAt: string }): Appointment {
     const appointment: Appointment = {
       id: randomUUID(),
       ...input,
@@ -99,8 +103,8 @@ export class Store {
       createdAt: new Date().toISOString(),
     };
     this.db
-      .prepare('INSERT INTO appointments (id, name, phone, starts_at, status, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(appointment.id, appointment.name, appointment.phone, appointment.startsAt, appointment.status, appointment.createdAt);
+      .prepare('INSERT INTO appointments (id, name, service, phone, starts_at, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(appointment.id, appointment.name, appointment.service, appointment.phone, appointment.startsAt, appointment.status, appointment.createdAt);
     return appointment;
   }
 
@@ -112,6 +116,11 @@ export class Store {
   list(): Appointment[] {
     const rows = this.db.prepare('SELECT * FROM appointments ORDER BY starts_at ASC').all() as unknown as Row[];
     return rows.map(toAppointment);
+  }
+
+  takenStarts(): Set<string> {
+    const rows = this.db.prepare("SELECT starts_at FROM appointments WHERE status != 'cancelled'").all() as unknown as { starts_at: string }[];
+    return new Set(rows.map((r) => r.starts_at));
   }
 
   findUpcomingByPhone(phone: string, now: Date): Appointment | undefined {
