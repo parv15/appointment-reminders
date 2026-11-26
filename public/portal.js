@@ -90,11 +90,20 @@ function updateContinue() {
   $('to-details').disabled = !(state.service && state.slot);
 }
 
+function reminderNote(startsAt) {
+  const sendAt = new Date(new Date(startsAt).getTime() - config.reminderLeadMinutes * 60_000);
+  if (sendAt.getTime() - Date.now() < 120_000) {
+    return 'Your appointment is less than ' + duration(config.reminderLeadMinutes) + ' away, so your reminder text is sent right away.';
+  }
+  const at = tidy(formatter(config.timezone, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(sendAt));
+  return `We will text you a reminder ${duration(config.reminderLeadMinutes)} before, on ${at}. Just reply to that message.`;
+}
+
 function renderSummary() {
-  const box = $('summary');
-  box.replaceChildren(
+  $('summary').replaceChildren(
     el('strong', '', state.service),
     el('span', '', tidy(whenFormat().format(new Date(state.slot)))),
+    el('span', '', reminderNote(state.slot)),
   );
 }
 
@@ -128,18 +137,17 @@ function renderBooked(b) {
   [...$('track').children].forEach((li, i) => li.classList.toggle('on', !failed && i < rank));
   $('alert-error').hidden = !failed;
   $('alert-error').textContent = failed ? `Delivery status: ${status}. Check the number and try again from the admin dashboard.` : '';
-  $('reminder-note').textContent = `We will text you a reminder ${config.reminderLeadMinutes >= 1440 ? `${Math.round(config.reminderLeadMinutes / 1440)} day before` : `${Math.round(config.reminderLeadMinutes / 60)} hours before`}. Just reply to that message.`;
+  $('reminder-note').textContent = reminderNote(b.startsAt);
   show(3);
   return delivered || failed;
 }
 
 async function poll() {
   clearTimeout(pollTimer);
-  try {
-    state.booking = { ...state.booking, ...(await api(`/api/bookings/${state.booking.id}`)) };
+  const latest = await api(`/api/bookings/${state.booking.id}`).catch(() => null);
+  if (latest) {
+    state.booking = { ...state.booking, ...latest };
     if (renderBooked(state.booking)) return;
-  } catch {
-    // keep showing the last known state and retry
   }
   pollTimer = setTimeout(poll, 3000);
 }

@@ -12,7 +12,7 @@ export interface ActivityItem {
   detail?: string;
 }
 
-export function buildActivity(appointments: Appointment[], reminderLeadMinutes: number, limit = 60): ActivityItem[] {
+export function buildActivity(appointments: Appointment[], reminderLeadMinutes: number, now = new Date(), limit = 60): ActivityItem[] {
   const items: ActivityItem[] = [];
 
   for (const a of appointments) {
@@ -24,8 +24,14 @@ export function buildActivity(appointments: Appointment[], reminderLeadMinutes: 
     }
     if (a.reminderMessageId) {
       const releaseAt = new Date(new Date(a.startsAt).getTime() - reminderLeadMinutes * 60_000);
-      const at = releaseAt > new Date(a.createdAt) ? releaseAt.toISOString() : a.createdAt;
-      items.push({ ...base, at, kind: 'reminder', status: a.reminderStatus ?? 'queued' });
+      const released = releaseAt <= now && releaseAt > new Date(a.createdAt);
+      items.push({
+        ...base,
+        at: released ? releaseAt.toISOString() : a.createdAt,
+        kind: 'reminder',
+        status: a.reminderStatus ?? 'queued',
+        detail: releaseAt.toISOString(),
+      });
     }
     if (a.lastReply && a.lastReplyAt) {
       items.push({ ...base, at: a.lastReplyAt, kind: 'reply', detail: a.lastReply });

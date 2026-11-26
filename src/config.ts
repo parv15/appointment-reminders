@@ -36,7 +36,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const problems: string[] = [];
   const demo = env.DEMO_MODE === 'true';
 
-  const require = (name: string, hint: string) => {
+  const requiredUnlessDemo = (name: string, hint: string) => {
     const value = env[name]?.trim();
     if (!value && !demo) {
       problems.push(`${name} is not set. ${hint}`);
@@ -44,9 +44,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     return value ?? '';
   };
 
-  require('SENT_DM_API_KEY', 'Create a key at https://app.sent.dm/dashboard/api-keys');
+  requiredUnlessDemo('SENT_DM_API_KEY', 'Create a key at https://app.sent.dm/dashboard/api-keys');
   const webhookSecret = env.SENT_DM_WEBHOOK_SECRET?.trim() ?? '';
-  const businessName = require('BUSINESS_NAME', 'It appears in the reminder text, for example "Acme Dental"') || 'Demo Clinic';
+  const businessName = requiredUnlessDemo('BUSINESS_NAME', 'It appears in the reminder text, for example "Acme Dental"') || 'Demo Clinic';
 
   const port = Number(env.PORT ?? 3000);
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -73,7 +73,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     problems.push(`SLOT_MINUTES must be one of 10, 15, 20, 30, 45, 60, got "${env.SLOT_MINUTES}"`);
   }
 
-  const services = (env.SERVICES ?? env.SERVICE_NAME ?? 'Appointment').split(',').map((s) => s.trim()).filter(Boolean);
+  const services = (env.SERVICES ?? 'Appointment').split(',').map((s) => s.trim()).filter(Boolean);
   if (services.length === 0) {
     problems.push('SERVICES must list at least one service, for example "Dental checkup,Teeth cleaning"');
   }

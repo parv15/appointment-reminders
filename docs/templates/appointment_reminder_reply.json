@@ -1,0 +1,21 @@
+{
+  "name": "appointment_reminder_reply",
+  "category": "UTILITY",
+  "language": "en_US",
+  "submit_for_review": true,
+  "definition": {
+    "body": {
+      "multiChannel": {
+        "type": "text",
+        "template": "Hello {{0:variable}},\n\nThis is a reminder about your upcoming appointment with {{1:variable}} on {{2:variable}} at {{3:variable}}.\n\nReply C to confirm or R to reschedule.",
+        "variables": [
+          { "id": 0, "name": "customer_name", "type": "variable", "props": { "variableType": "text", "sample": "John" } },
+          { "id": 1, "name": "business_name", "type": "variable", "props": { "variableType": "text", "sample": "Acme Dental" } },
+          { "id": 2, "name": "appointment_date", "type": "variable", "props": { "variableType": "text", "sample": "Dec 31, 2026" } },
+          { "id": 3, "name": "appointment_time", "type": "variable", "props": { "variableType": "text", "sample": "1:00 PM" } }
+        ]
+      }
+    },
+    "definitionVersion": "1.0"
+  }
+}

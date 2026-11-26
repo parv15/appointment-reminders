@@ -51,6 +51,17 @@ function formatter(timeZone, options) {
 
 const tidy = (text) => text.replace(/[\u202f\u00a0]/g, ' ');
 
+function duration(minutes) {
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  const mins = minutes % 60;
+  return [
+    days && `${days} day${days > 1 ? 's' : ''}`,
+    hours && `${hours} hour${hours > 1 ? 's' : ''}`,
+    mins && `${mins} min`,
+  ].filter(Boolean).join(' ');
+}
+
 function ago(iso) {
   const seconds = Math.round((Date.now() - new Date(iso)) / 1000);
   if (seconds < 60) return 'just now';

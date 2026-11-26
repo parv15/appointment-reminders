@@ -69,7 +69,7 @@ const FEED = {
   alert: { icon: '!', text: (i) => `Booking alert to ${i.phone}` },
   reminder: {
     icon: '🔔',
-    text: (i) => (new Date(i.at) > Date.now() ? `Reminder to ${i.phone} scheduled for ${when(i.at)}` : `Reminder to ${i.phone}`),
+    text: (i) => (i.status === 'scheduled' ? `Reminder to ${i.phone} scheduled for ${when(i.detail)}` : `Reminder to ${i.phone}`),
   },
   reply: { icon: '↩', text: (i) => `${i.name} replied "${i.detail}"` },
 };
@@ -170,6 +170,7 @@ async function init() {
   if (result.ok) {
     config = result.value;
     $('business').textContent = config.businessName;
+    $('tagline').textContent = `Reminders go out ${duration(config.reminderLeadMinutes)} before each appointment`;
     document.title = `${config.businessName} admin`;
     const mode = $('mode');
     mode.hidden = false;
