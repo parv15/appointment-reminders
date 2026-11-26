@@ -136,7 +136,7 @@ export function createSentMessenger(options: { sandbox: boolean; templates: Temp
       if (sandbox) return true;
       if (twoWayCache && Date.now() - twoWayCache.at < STATUS_TTL_MS) return twoWayCache.value;
       const channels = (await client.channels.list()).data;
-      const value = Boolean(channels?.sms?.some((market) => market.number_type !== 'ALPHANUMERIC' && market.numbers?.length) || channels?.whatsapp || channels?.rcs);
+      const value = Boolean(channels?.sms?.some((market) => market.number_type !== 'ALPHANUMERIC' && market.numbers?.some((n) => n.status === 'ACTIVE')) || channels?.whatsapp || channels?.rcs);
       twoWayCache = { value, at: Date.now() };
       return value;
     },
