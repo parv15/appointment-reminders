@@ -10,7 +10,7 @@
         "template": "Hello {{0:variable}},\n\nThank you for booking with {{1:variable}}.\n\nYour appointment for {{2:variable}} on {{3:variable}} at {{4:variable}} is confirmed.\n\nReply C to confirm you will attend or R to reschedule.",
         "variables": [
           { "id": 0, "name": "customer_name", "type": "variable", "props": { "variableType": "text", "sample": "John" } },
-          { "id": 1, "name": "business_name", "type": "variable", "props": { "variableType": "text", "sample": "Acme Dental" } },
+          { "id": 1, "name": "business_name", "type": "variable", "props": { "variableType": "text", "sample": "Maple Street Dental" } },
           { "id": 2, "name": "service_name", "type": "variable", "props": { "variableType": "text", "sample": "Dental checkup" } },
           { "id": 3, "name": "appointment_date", "type": "variable", "props": { "variableType": "text", "sample": "Dec 31, 2026" } },
           { "id": 4, "name": "appointment_time", "type": "variable", "props": { "variableType": "text", "sample": "1:00 PM" } }

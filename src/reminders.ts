@@ -1,6 +1,6 @@
 import type { Config } from './config.js';
 import { explainSentError } from './errors.js';
-import type { Messenger } from './messenger.js';
+import { DELIVERY_CHANNELS, type Messenger } from './messenger.js';
 import { classifyReply } from './replies.js';
 import type { Appointment, Store } from './store.js';
 
@@ -208,7 +208,8 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
 
     handleStatus(event, payload) {
       if (payload.message_id) {
-        store.setMessageStatus(payload.message_id, event.replace(/^message\./, ''), payload.channel?.toLowerCase());
+        const channel = payload.channel?.toLowerCase();
+        store.setMessageStatus(payload.message_id, event.replace(/^message\./, ''), channel && DELIVERY_CHANNELS.has(channel) ? channel : undefined);
       }
     },
 

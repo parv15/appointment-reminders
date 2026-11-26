@@ -2,7 +2,7 @@ import express, { type ErrorRequestHandler } from 'express';
 import { fileURLToPath } from 'node:url';
 import { buildActivity } from './activity.js';
 import { attentionFor } from './attention.js';
-import { adminAuth } from './auth.js';
+import { createAdminAuth } from './auth.js';
 import type { Config } from './config.js';
 import { explainSentError } from './errors.js';
 import type { TemplateReport } from './messenger.js';
@@ -16,13 +16,14 @@ const NAME = /^\p{L}[\p{L} '’-]{1,29}$/u;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const PUBLIC_DIR = fileURLToPath(new URL('../public', import.meta.url));
 const ADMIN_DIR = fileURLToPath(new URL('../admin', import.meta.url));
+const LOGIN_PAGE = fileURLToPath(new URL('../public/admin-login.html', import.meta.url));
 
 const optionalNumber = (value: unknown) => (typeof value === 'number' ? value : undefined);
 
 const header = (req: express.Request, name: string) =>
   req.header(`webhook-${name}`) ?? req.header(`x-webhook-${name}`) ?? '';
 
-const publicView = (a: Appointment) => ({
+const publicView = (a: Appointment, defaultLeadMinutes: number) => ({
   id: a.id,
   name: a.name,
   service: a.service,
@@ -31,14 +32,14 @@ const publicView = (a: Appointment) => ({
   status: a.status,
   alertStatus: a.confirmationMessageId ? (a.confirmationStatus ?? 'queued') : null,
   alertChannel: a.confirmationChannel,
-  reminderMinutes: a.reminderLeadMinutes,
+  reminderMinutes: a.reminderLeadMinutes ?? defaultLeadMinutes,
   reminderStatus: a.reminderMessageId ? (a.reminderStatus ?? 'queued') : null,
 });
 
 export function createApp(deps: { store: Store; reminders: Reminders; config: Config; templateReport?: () => Promise<TemplateReport[]> }) {
   const { store, reminders, config, templateReport } = deps;
   const app = express();
-  const admin = adminAuth(config.adminPassword);
+  const auth = createAdminAuth(config.adminPassword);
 
   app.post('/webhooks/sent', express.raw({ type: 'application/json' }), async (req, res) => {
     if (!config.webhookSecret) {
@@ -74,15 +75,22 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
   });
 
   app.use(express.json());
-  app.use('/admin', admin, express.static(ADMIN_DIR));
+  app.get('/admin/login', (req, res) => {
+    if (auth.isSignedIn(req)) res.redirect('/admin/');
+    else res.sendFile(LOGIN_PAGE);
+  });
+  app.use('/admin', auth.requirePage, express.static(ADMIN_DIR));
   app.use(express.static(PUBLIC_DIR));
 
   app.get('/healthz', (_req, res) => {
     res.json({ ok: true });
   });
 
-  app.get('/api/config', (_req, res) => {
+  app.get('/api/config', async (_req, res) => {
+    const templates = templateReport ? await templateReport().catch(() => []) : [];
+    const repliesInText = templates.length > 0 && templates.every((t) => t.using === t.preferred && t.preferredStatus === 'APPROVED');
     res.json({
+      repliesInText,
       sandbox: config.sandbox,
       businessName: config.businessName,
       services: config.services,
@@ -119,7 +127,7 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
     }
 
     const booking = await reminders.book({ name: name.trim(), service, phone, startsAt: start.toISOString(), reminderMinutes: optionalNumber(reminderMinutes) });
-    res.status(201).json({ ...publicView(booking), ...(booking.confirmationError && { alertError: booking.confirmationError }) });
+    res.status(201).json({ ...publicView(booking, config.reminderOptions[0]!), ...(booking.confirmationError && { alertError: booking.confirmationError }) });
   });
 
   app.get('/api/bookings/:id', async (req, res) => {
@@ -129,10 +137,15 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
       res.status(404).json({ error: 'Booking not found.' });
       return;
     }
-    res.json(publicView(booking));
+    res.json(publicView(booking, config.reminderOptions[0]!));
   });
 
-  app.use('/api/admin', admin);
+  app.get('/api/admin/session', (req, res) => {
+    res.json({ required: auth.enabled, signedIn: auth.isSignedIn(req) });
+  });
+  app.post('/api/admin/login', auth.login);
+  app.post('/api/admin/logout', auth.logout);
+  app.use('/api/admin', auth.requireApi);
 
   app.get('/api/admin/appointments', async (_req, res) => {
     await reminders.syncStatuses();

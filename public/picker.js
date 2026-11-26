@@ -1,6 +1,6 @@
 const MIN_REMINDER_GAP_MS = 3 * 60_000;
 
-function createPicker(root, { config, excludeId = null, withServices = false, onChange = () => {} }) {
+function createPicker(root, { config, excludeId = null, withServices = false, onChange = () => {}, onFirstSlot = () => {} }) {
   const state = { service: config.services[0], date: null, slot: null, lead: null };
   const slotTime = formatter(config.timezone, { timeStyle: 'short' });
   const dayLabel = formatter(config.timezone, { weekday: 'short', day: 'numeric', month: 'short' });
@@ -28,7 +28,7 @@ function createPicker(root, { config, excludeId = null, withServices = false, on
   root.append(
     group('Day', [parts.days], withServices ? 'field-gap' : ''),
     group(`Time (${config.timezone.replace('_', ' ')})`, [parts.slots, parts.none], 'field-gap'),
-    group('Text me a reminder', [parts.reminders, parts.preview], 'field-gap'),
+    group('Send my reminder', [parts.reminders, parts.preview], 'field-gap'),
   );
 
   function value() {
@@ -144,15 +144,25 @@ function createPicker(root, { config, excludeId = null, withServices = false, on
     );
   }
 
+  let first = null;
+
   async function selectFirstOpenDay() {
     for (const { key } of days()) {
       const slots = await loadSlots(key);
       if (slots && slots.length > 0) {
+        first = { key, iso: slots[0] };
+        onFirstSlot(slots[0]);
         await selectDate(key);
         return;
       }
     }
     await selectDate(days()[0].key);
+  }
+
+  async function pickFirst() {
+    if (!first) return;
+    await selectDate(first.key);
+    parts.slots.querySelector('.slot')?.click();
   }
 
   renderServices();
@@ -162,6 +172,7 @@ function createPicker(root, { config, excludeId = null, withServices = false, on
 
   return {
     value,
+    pickFirst,
     reset() {
       Object.assign(state, { service: config.services[0], date: null, slot: null, lead: null });
       renderServices();

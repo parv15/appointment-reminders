@@ -36,7 +36,7 @@ export interface TemplateLists {
 }
 
 const STATUS_TTL_MS = 5 * 60_000;
-const DELIVERY_CHANNELS = new Set(['sms', 'mms', 'whatsapp', 'rcs']);
+export const DELIVERY_CHANNELS = new Set(['sms', 'mms', 'whatsapp', 'rcs']);
 const PURPOSES: Record<keyof TemplateLists, string> = {
   reminder: 'Reminder',
   confirmation: 'Booking confirmation',

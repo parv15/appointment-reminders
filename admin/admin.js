@@ -17,6 +17,7 @@ function appearIfNew(node, key, n) {
 const when = (iso) => tidy(formatter(config.timezone, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso)));
 const relative = (iso) => (new Date(iso) > Date.now() ? until(iso) : ago(iso));
 const channelName = (channel) => (channel ? channel.toUpperCase() : null);
+const listOf = (items) => (items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} or ${items.at(-1)}`);
 
 function renderStats() {
   const live = appointments.filter((a) => a.status !== 'cancelled');
@@ -44,7 +45,7 @@ function reminderPill(a) {
     return pill(`Reminder due ${when(at)}`, status);
   }
   const channel = channelName(a.reminderChannel);
-  return pill(`Reminder ${label(status)}${channel ? ` · ${channel}` : ''}`, status);
+  return pill(`Reminder ${label(status)}${channel ? ` via ${channel}` : ''}`, status);
 }
 
 function renderList() {
@@ -66,10 +67,10 @@ function renderList() {
     const meta = el('div', 'meta');
     meta.append(pill(label(a.status), a.status));
     if (a.attention === 'reschedule') meta.append(pill('Asked to reschedule', 'reschedule_requested'));
-    if (a.attention === 'no_reply') meta.append(pill('No reply yet, call them', 'failed'));
+    if (a.attention === 'no_reply') meta.append(pill('No reply yet', 'failed'));
     if (a.confirmationMessageId) {
       const channel = channelName(a.confirmationChannel);
-      meta.append(pill(`Confirmation ${label(a.confirmationStatus)}${channel ? ` · ${channel}` : ''}`, a.confirmationStatus));
+      meta.append(pill(`Confirmation ${label(a.confirmationStatus)}${channel ? ` via ${channel}` : ''}`, a.confirmationStatus));
     }
     const reminder = reminderPill(a);
     if (reminder) meta.append(reminder);
@@ -101,10 +102,10 @@ function renderList() {
 
 const FEED = {
   booked: { icon: '+', text: (i) => `${i.name} booked ${i.service} for ${when(i.startsAt)}` },
-  alert: { icon: '!', text: (i) => `Booking text to ${i.phone}` },
+  alert: { icon: '!', text: (i) => `Confirmation text sent to ${i.phone}` },
   reminder: {
     icon: 'R',
-    text: (i) => (i.status === 'scheduled' ? `Reminder to ${i.phone} due ${when(i.detail)}` : `Reminder to ${i.phone}`),
+    text: (i) => (i.status === 'scheduled' ? `Reminder for ${i.phone} is due ${when(i.detail)}` : `Reminder sent to ${i.phone}`),
   },
   reply: { icon: '\u21A9', text: (i) => `${i.name} replied "${i.detail}"` },
 };
@@ -138,7 +139,7 @@ function renderNotice(templates) {
 
   const lines = stale.map((t) => `${t.purpose}: "${t.preferred}" is ${t.preferredStatus.toLowerCase()}, so texts use "${t.using}" for now.`);
   $('notice').replaceChildren(
-    el('strong', '', 'Texts do not say how to reply yet'),
+    el('strong', '', 'Your texts do not tell customers how to reply yet'),
     el('span', '', 'Your own templates are waiting for approval from Sent. Until then the standard templates are used, and they leave out "Reply C to confirm or R to reschedule". The app switches over by itself once yours are approved.'),
     ...lines.map((line) => el('span', 'muted', line)),
   );
@@ -199,12 +200,19 @@ $('tabs').addEventListener('click', (event) => {
   renderList();
 });
 
+$('sign-out').addEventListener('click', async () => {
+  await api('/api/admin/logout', { method: 'POST' }).catch(() => undefined);
+  location.href = '/admin/login';
+});
+
 async function init() {
+  const session = await api('/api/admin/session').catch(() => null);
+  $('sign-out').hidden = !session?.required;
   const result = await attempt(() => api('/api/config'));
   if (result.ok) {
     config = result.value;
     $('business').textContent = config.businessName;
-    $('tagline').textContent = `Reminders go out ${config.reminderOptions.map(duration).join(', ')} before an appointment, as each customer chooses.`;
+    $('tagline').textContent = `Customers choose whether the reminder arrives ${listOf(config.reminderOptions.map(duration))} before the appointment.`;
     document.title = `${config.businessName} admin`;
     const mode = $('mode');
     mode.hidden = false;

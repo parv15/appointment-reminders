@@ -46,7 +46,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
 
   required('SENT_DM_API_KEY', 'Create a key at https://app.sent.dm/dashboard/api-keys');
   const webhookSecret = env.SENT_DM_WEBHOOK_SECRET?.trim() ?? '';
-  const businessName = required('BUSINESS_NAME', 'It appears in the reminder text, for example "Acme Dental"');
+  const businessName = required('BUSINESS_NAME', 'It appears in the reminder text, for example "Maple Street Dental"');
 
   const port = Number(env.PORT ?? 3000);
   if (!Number.isInteger(port) || port < 1 || port > 65535) {

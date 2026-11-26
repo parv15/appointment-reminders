@@ -71,6 +71,9 @@ async function api(path, options = {}) {
     throw new Error('Cannot reach the server. Is it still running?');
   }
   const body = await response.json().catch(() => ({}));
+  if (response.status === 401 && path.startsWith('/api/admin/') && path !== '/api/admin/login') {
+    location.href = '/admin/login';
+  }
   if (!response.ok) {
     throw new Error(body.error ?? `Request failed (${response.status})`);
   }

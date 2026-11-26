@@ -23,17 +23,18 @@
       <div class="top-actions">
         <span id="mode" class="mode" hidden></span>
         <a class="btn btn-ghost btn-sm" data-roll href="/" target="_blank" rel="noopener">Open booking portal</a>
+        <button type="button" class="btn btn-ghost btn-sm" id="sign-out" data-roll hidden>Sign out</button>
       </div>
     </div>
   </header>
 
   <main class="frame">
-    <section class="band hero">
+    <section class="band pad hero">
       <div class="rise" style="--d:0">
         <p class="eyebrow">Dashboard</p>
-        <h1>Every booking,<br>every text.</h1>
+        <h1 style="margin-top:14px">Bookings<br>and messages</h1>
       </div>
-      <p class="lede rise" style="--d:2" id="tagline">Bookings, delivery status and replies in one place.</p>
+      <p class="lede rise" style="--d:2" id="tagline">See every booking, whether each text arrived, and what customers replied.</p>
     </section>
 
     <section class="band tight">
@@ -46,32 +47,32 @@
       </div>
     </section>
 
-    <section class="band dots">
-      <div class="layout">
-        <div class="card pad rise" style="--d:4">
-          <div class="section-title">
-            <h2>Bookings</h2>
-            <div class="tabs" id="tabs" role="tablist">
-              <button type="button" class="on" data-filter="all">All</button>
-              <button type="button" data-filter="scheduled">Upcoming</button>
-              <button type="button" data-filter="confirmed">Confirmed</button>
-              <button type="button" data-filter="attention">Needs attention</button>
-              <button type="button" data-filter="cancelled">Cancelled</button>
-            </div>
-          </div>
-          <ul id="list" class="list"></ul>
-          <div id="empty" class="empty" hidden>
-            <strong>No bookings here</strong>
-            <span>Bookings made on the <a href="/" target="_blank" rel="noopener">booking portal</a> show up here.</span>
+    <section class="band split wide">
+      <div class="pane rise" style="--d:4">
+        <div class="section-title">
+          <h2>Bookings</h2>
+          <div class="tabs" id="tabs" role="tablist">
+            <button type="button" class="on" data-filter="all">All</button>
+            <button type="button" data-filter="scheduled">Upcoming</button>
+            <button type="button" data-filter="confirmed">Confirmed</button>
+            <button type="button" data-filter="attention">Needs attention</button>
+            <button type="button" data-filter="cancelled">Cancelled</button>
           </div>
         </div>
+        <ul id="list" class="list"></ul>
+        <div id="empty" class="empty" hidden>
+          <strong>No bookings here</strong>
+          <span>Bookings made on the <a href="/" target="_blank" rel="noopener">booking portal</a> show up here.</span>
+        </div>
+      </div>
 
-        <aside class="card pad rise" style="--d:5">
+      <aside class="panel">
+        <div class="feed-card rise" style="--d:5">
           <div class="section-title"><h2>Alerts and activity</h2></div>
           <ul id="feed" class="feed"></ul>
           <p id="feed-empty" class="muted" hidden>Nothing yet.</p>
-        </aside>
-      </div>
+        </div>
+      </aside>
     </section>
   </main>
 
