@@ -2,7 +2,6 @@ import type { SlotRules } from './slots.js';
 
 export interface Config {
   port: number;
-  demo: boolean;
   webhookSecret: string;
   templateName: string;
   confirmationTemplateName: string;
@@ -34,19 +33,18 @@ function validTimezone(timezone: string): boolean {
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const problems: string[] = [];
-  const demo = env.DEMO_MODE === 'true';
 
-  const requiredUnlessDemo = (name: string, hint: string) => {
-    const value = env[name]?.trim();
-    if (!value && !demo) {
+  const required = (name: string, hint: string) => {
+    const value = env[name]?.trim() ?? '';
+    if (!value) {
       problems.push(`${name} is not set. ${hint}`);
     }
-    return value ?? '';
+    return value;
   };
 
-  requiredUnlessDemo('SENT_DM_API_KEY', 'Create a key at https://app.sent.dm/dashboard/api-keys');
+  required('SENT_DM_API_KEY', 'Create a key at https://app.sent.dm/dashboard/api-keys');
   const webhookSecret = env.SENT_DM_WEBHOOK_SECRET?.trim() ?? '';
-  const businessName = requiredUnlessDemo('BUSINESS_NAME', 'It appears in the reminder text, for example "Acme Dental"') || 'Demo Clinic';
+  const businessName = required('BUSINESS_NAME', 'It appears in the reminder text, for example "Acme Dental"');
 
   const port = Number(env.PORT ?? 3000);
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -84,7 +82,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
 
   return {
     port,
-    demo,
     webhookSecret,
     templateName: env.SENT_TEMPLATE_NAME ?? 'appointment_reminder_reply,sent_Appointment_Reminder_2',
     confirmationTemplateName: env.SENT_CONFIRMATION_TEMPLATE ?? 'appointment_confirmation_reply,sent_Appointment_Confirmation_1',
@@ -96,6 +93,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     reminderLeadMinutes,
     timezone,
     sandbox: env.SENT_SANDBOX === 'true',
-    databasePath: env.DATABASE_PATH ?? (demo ? ':memory:' : './data/appointments.db'),
+    databasePath: env.DATABASE_PATH ?? './data/appointments.db',
   };
 }

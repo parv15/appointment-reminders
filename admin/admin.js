@@ -1,6 +1,5 @@
 let config = {};
 let filter = 'all';
-let selectedPhone = null;
 let appointments = [];
 
 const when = (iso) => tidy(formatter(config.timezone, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso)));
@@ -25,9 +24,9 @@ function renderList() {
     row.append(el('span', 'avatar', initials(a.name)));
 
     const who = el('div', 'who');
-    who.append(el('strong', '', `${a.name}  `));
-    who.firstChild.append(el('span', 'service', a.service));
-    who.append(el('span', '', `${a.phone}  ·  ${when(a.startsAt)} (${until(a.startsAt)})`));
+    const name = el('strong', '', `${a.name}  `);
+    name.append(el('span', 'service', a.service));
+    who.append(name, el('span', '', `${a.phone}  ·  ${when(a.startsAt)} (${until(a.startsAt)})`));
 
     const meta = el('div', 'meta');
     meta.append(el('span', `pill ${a.status}`, label(a.status)));
@@ -38,15 +37,6 @@ function renderList() {
     row.append(who);
 
     const actions = el('div', 'actions');
-    if (config.demo) {
-      const open = el('button', 'ghost', 'Open phone');
-      open.type = 'button';
-      open.addEventListener('click', () => {
-        selectedPhone = a.phone;
-        refresh();
-      });
-      actions.append(open);
-    }
     if (a.status !== 'cancelled') {
       const cancel = el('button', 'ghost danger', 'Cancel');
       cancel.type = 'button';
@@ -68,82 +58,41 @@ const FEED = {
   booked: { icon: '+', text: (i) => `${i.name} booked ${i.service} for ${when(i.startsAt)}` },
   alert: { icon: '!', text: (i) => `Booking alert to ${i.phone}` },
   reminder: {
-    icon: '🔔',
+    icon: '\u{1F514}',
     text: (i) => (i.status === 'scheduled' ? `Reminder to ${i.phone} scheduled for ${when(i.detail)}` : `Reminder to ${i.phone}`),
   },
-  reply: { icon: '↩', text: (i) => `${i.name} replied "${i.detail}"` },
+  reply: { icon: '\u21A9', text: (i) => `${i.name} replied "${i.detail}"` },
 };
 
 function renderFeed(items) {
   const feed = $('feed');
   feed.replaceChildren();
   $('feed-empty').hidden = items.length > 0;
+
   for (const item of items) {
     const li = el('li', `feed-item ${item.kind}`);
     li.append(el('span', 'feed-icon', FEED[item.kind].icon));
+
     const body = el('div', 'feed-body');
     body.append(el('span', '', FEED[item.kind].text(item)));
     const meta = el('small', '', relative(item.at));
-    if (item.status) {
-      meta.append(' ', el('span', `pill ${item.status}`, label(item.status)));
-    }
+    if (item.status) meta.append(' ', el('span', `pill ${item.status}`, label(item.status)));
     body.append(meta);
+
     li.append(body);
     feed.append(li);
   }
 }
 
-function renderThread(messages) {
-  const thread = $('thread');
-  thread.replaceChildren();
-  const customer = appointments.find((a) => a.phone === selectedPhone);
-  $('phone-avatar').textContent = customer ? initials(customer.name) : '?';
-  $('phone-name').textContent = customer ? customer.name : 'Customer phone';
-  $('phone-number').textContent = selectedPhone ?? "Open a booking's phone";
-
-  const mine = messages.filter((m) => m.phone === selectedPhone);
-  if (mine.length === 0) {
-    thread.append(el('p', 'thread-empty', 'No messages yet'));
-    return;
-  }
-  for (const m of mine) {
-    const bubble = el('div', `bubble ${m.direction}`, m.body);
-    bubble.append(
-      el('small', '', m.status === 'scheduled' ? `Scheduled for ${when(m.scheduledAt)}` : m.status === 'cancelled' ? 'Cancelled before sending' : ago(m.createdAt)),
-    );
-    if (m.status === 'scheduled') {
-      const release = el('button', '', 'Deliver now');
-      release.type = 'button';
-      release.addEventListener('click', async () => {
-        if ((await attempt(() => api(`/api/admin/demo/messages/${m.id}/release`, { method: 'POST' }))).ok) refresh();
-      });
-      bubble.append(release);
-    }
-    thread.append(bubble);
-  }
-  thread.scrollTop = thread.scrollHeight;
-}
-
 async function refresh() {
   try {
     appointments = await api('/api/admin/appointments');
-    if (config.demo && !selectedPhone && appointments.length > 0) selectedPhone = appointments.at(-1).phone;
     renderStats();
     renderList();
     renderFeed(await api('/api/admin/activity'));
-    if (config.demo) renderThread(await api('/api/admin/demo/messages'));
   } catch (err) {
     showError(err.message);
   }
-}
-
-async function sendReply(text) {
-  if (!selectedPhone) {
-    showError('Open a booking first, then reply as that customer.');
-    return;
-  }
-  const result = await attempt(() => api('/api/admin/demo/replies', { method: 'POST', body: JSON.stringify({ phone: selectedPhone, text }) }));
-  if (result.ok) refresh();
 }
 
 $('tabs').addEventListener('click', (event) => {
@@ -154,17 +103,6 @@ $('tabs').addEventListener('click', (event) => {
   renderList();
 });
 
-$('reply').addEventListener('submit', (event) => {
-  event.preventDefault();
-  const input = $('reply').elements.text;
-  sendReply(input.value);
-  input.value = '';
-});
-
-for (const button of document.querySelectorAll('.quick button')) {
-  button.addEventListener('click', () => sendReply(button.dataset.text));
-}
-
 async function init() {
   const result = await attempt(() => api('/api/config'));
   if (result.ok) {
@@ -174,9 +112,8 @@ async function init() {
     document.title = `${config.businessName} admin`;
     const mode = $('mode');
     mode.hidden = false;
-    mode.className = `mode ${config.demo ? 'demo' : config.sandbox ? 'sandbox' : 'live'}`;
-    mode.textContent = config.demo ? 'Demo, Sent simulated' : config.sandbox ? 'Sandbox, nothing delivered' : 'Live';
-    $('phone').hidden = !config.demo;
+    mode.className = `mode ${config.sandbox ? 'sandbox' : 'live'}`;
+    mode.textContent = config.sandbox ? 'Sandbox, nothing delivered' : 'Live';
   }
   await refresh();
   setInterval(refresh, 4000);

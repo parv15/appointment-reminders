@@ -1,6 +1,7 @@
 const $ = (id) => document.getElementById(id);
 
-const label = (value) => (value ?? 'none').replaceAll('_', ' ');
+const STATUS_LABELS = { processed: 'queued', routed: 'sending' };
+const label = (value) => STATUS_LABELS[value] ?? (value ?? 'none').replaceAll('_', ' ');
 const initials = (name) => name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
 
 function el(tag, className, text) {

@@ -1,7 +1,6 @@
 import SentDm from '@sentdm/sentdm';
 import { createApp } from './app.js';
 import { ConfigError, loadConfig, type Config } from './config.js';
-import { DemoMessenger } from './demo.js';
 import { explainSentError } from './errors.js';
 import { createSentMessenger } from './messenger.js';
 import { createReminders } from './reminders.js';
@@ -18,7 +17,7 @@ function readConfig(): Config {
   } catch (err) {
     if (!(err instanceof ConfigError)) throw err;
     const problems = err.problems.map((p) => `  - ${p}`).join('\n');
-    return fail(`Cannot start, fix the configuration:\n${problems}\n\nSee .env.example, or run "npm run demo" to try it without Sent.`);
+    return fail(`Cannot start, fix the configuration:\n${problems}\n\nSee .env.example for every setting.`);
   }
 }
 
@@ -52,18 +51,14 @@ async function connectToSent(config: Config) {
 
 const config = readConfig();
 const store = new Store(config.databasePath);
-const demo = config.demo ? new DemoMessenger((messageId, status) => store.setMessageStatus(messageId, status)) : undefined;
-const messenger = demo ?? (await connectToSent(config));
+const messenger = await connectToSent(config);
 const reminders = createReminders({ store, messenger, config });
 
-const server = createApp({ store, reminders, config, demo }).listen(config.port, (err?: NodeJS.ErrnoException) => {
+const server = createApp({ store, reminders, config }).listen(config.port, (err?: NodeJS.ErrnoException) => {
   if (err) {
     fail(err.code === 'EADDRINUSE' ? `Port ${config.port} is already in use. Set PORT to another value.` : `Cannot listen on port ${config.port}: ${err.message}`);
   }
   console.log(`Appointment reminders listening on http://localhost:${config.port}`);
-  if (demo) {
-    console.log('Demo mode: Sent is simulated locally, nothing is sent');
-  }
 });
 
 function shutdown() {

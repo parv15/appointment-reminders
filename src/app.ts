@@ -3,7 +3,6 @@ import { fileURLToPath } from 'node:url';
 import { buildActivity } from './activity.js';
 import { adminAuth } from './auth.js';
 import type { Config } from './config.js';
-import type { DemoMessenger } from './demo.js';
 import { explainSentError } from './errors.js';
 import { ValidationError, type Reminders } from './reminders.js';
 import { verifyWebhook } from './signature.js';
@@ -29,8 +28,8 @@ const publicView = (a: Appointment) => ({
   alertStatus: a.confirmationMessageId ? (a.confirmationStatus ?? 'queued') : null,
 });
 
-export function createApp(deps: { store: Store; reminders: Reminders; config: Config; demo?: DemoMessenger }) {
-  const { store, reminders, config, demo } = deps;
+export function createApp(deps: { store: Store; reminders: Reminders; config: Config }) {
+  const { store, reminders, config } = deps;
   const app = express();
   const admin = adminAuth(config.adminPassword);
 
@@ -77,7 +76,6 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
 
   app.get('/api/config', (_req, res) => {
     res.json({
-      demo: demo !== undefined,
       sandbox: config.sandbox,
       businessName: config.businessName,
       services: config.services,
@@ -145,30 +143,6 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
     }
     res.json(appointment);
   });
-
-  if (demo) {
-    app.get('/api/admin/demo/messages', (_req, res) => {
-      res.json(demo.list());
-    });
-
-    app.post('/api/admin/demo/messages/:id/release', (req, res) => {
-      if (!demo.release(req.params.id)) {
-        res.status(404).json({ error: 'That message is not waiting to be delivered.' });
-        return;
-      }
-      res.json({ released: true });
-    });
-
-    app.post('/api/admin/demo/replies', async (req, res) => {
-      const { phone, text } = req.body ?? {};
-      if (typeof phone !== 'string' || typeof text !== 'string' || !text.trim()) {
-        throw new ValidationError('Pick an appointment and type a reply.');
-      }
-      demo.recordInbound(phone, text);
-      await reminders.handleInbound({ inbound_number: phone, channel: 'sms', text });
-      res.json({ received: true });
-    });
-  }
 
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'Not found.' });

@@ -47,7 +47,6 @@ kbd { min-width: 56px; text-align: center; padding: 3px 10px; border-radius: 8px
 .mode { padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; letter-spacing: .02em; }
 .mode.live { background: #16a34a22; color: var(--good); }
 .mode.sandbox { background: #d9770622; color: var(--warn); }
-.mode.demo { background: #2563eb22; color: var(--accent); }
 
 .shell { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; max-width: 1180px; margin: 0 auto; padding: 16px 24px 48px; }
 .shell:has(aside) { grid-template-columns: minmax(0, 1fr) 360px; align-items: start; }
@@ -72,7 +71,7 @@ aside { display: grid; gap: 16px; min-width: 0; }
 .pill.confirmed, .pill.delivered, .pill.sent, .pill.read { background: #16a34a22; color: var(--good); }
 .pill.reschedule_requested { background: #d9770622; color: var(--warn); }
 .pill.cancelled, .pill.failed, .pill.blocked { background: #dc262622; color: var(--bad); }
-.pill.scheduled, .pill.queued { background: #2563eb22; color: var(--accent); }
+.pill.scheduled, .pill.queued, .pill.processed, .pill.routed { background: #2563eb22; color: var(--accent); }
 
 /* Stepper */
 .steps { display: flex; gap: 8px; margin: 0; padding: 0; list-style: none; }
@@ -157,23 +156,6 @@ form#details small { color: var(--muted); font-size: 12px; font-weight: 400; }
 .feed-item.reply .feed-icon { background: #16a34a22; color: var(--good); }
 .feed-body { display: grid; gap: 2px; }
 .feed-body small { color: var(--muted); font-size: 12px; }
-
-/* Simulated phone (demo mode) */
-.device-bar { display: flex; align-items: center; gap: 10px; padding: 4px 6px 10px; border-bottom: 1px solid var(--line); }
-.device-bar .avatar { width: 34px; height: 34px; font-size: 14px; }
-.device-bar small { display: block; color: var(--muted); font-size: 12px; }
-.thread { display: flex; flex-direction: column; gap: 8px; min-height: 280px; max-height: 420px; padding: 4px; overflow-y: auto; }
-.thread-empty { margin: auto; color: var(--muted); font-size: 13px; text-align: center; }
-.bubble { align-self: flex-start; max-width: 85%; padding: 8px 12px; border-radius: 16px 16px 16px 4px; background: var(--bubble); font-size: 14px; white-space: pre-line; overflow-wrap: anywhere; }
-.bubble.inbound { align-self: flex-end; border-radius: 16px 16px 4px 16px; background: var(--accent); color: #fff; }
-.bubble small { display: block; margin-top: 4px; font-size: 11px; opacity: .7; }
-.bubble button { margin-top: 8px; padding: 5px 12px; border-radius: 8px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 600; }
-.quick { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
-.quick button { padding: 5px 14px; border-radius: 999px; background: var(--bubble); color: var(--text); font-size: 13px; font-weight: 600; }
-.quick button:hover { background: var(--accent); color: #fff; }
-form#reply { display: flex; gap: 8px; }
-form#reply input { flex: 1; border-radius: 999px; }
-form#reply button { width: 38px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 18px; }
 
 #toast { position: fixed; top: 16px; left: 50%; z-index: 10; max-width: min(560px, 92vw); padding: 12px 18px; transform: translateX(-50%); border-radius: 10px; background: var(--bad); box-shadow: 0 8px 24px #0004; color: #fff; font-size: 14px; }
 

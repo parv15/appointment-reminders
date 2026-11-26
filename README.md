@@ -2,7 +2,7 @@
 
 # Appointment reminders with reply handling
 
-Appointment booking with text message confirmations and reminders, where customers reply to confirm or reschedule. Built with the [Sent](https://sent.dm) API.
+Appointment booking that texts customers a confirmation and a reminder through [Sent](https://sent.dm), and updates the booking when they reply.
 
 [![CI](https://github.com/parv15/sent-appointment-reminders/actions/workflows/ci.yml/badge.svg)](https://github.com/parv15/sent-appointment-reminders/actions/workflows/ci.yml)
 [![Node](https://img.shields.io/badge/node-%E2%89%A522.13-339933?logo=node.js&logoColor=white)](https://nodejs.org)
@@ -10,7 +10,7 @@ Appointment booking with text message confirmations and reminders, where custome
 [![Sent SDK](https://img.shields.io/badge/%40sentdm%2Fsentdm-0.55-2563eb)](https://www.npmjs.com/package/@sentdm/sentdm)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-<img src="docs/screenshots/admin-dashboard.png" alt="Admin dashboard with bookings, alerts and a simulated customer phone" width="860">
+<img src="docs/screenshots/admin-dashboard.png" alt="Admin dashboard with bookings and the alerts and activity feed" width="860">
 
 </div>
 
@@ -36,29 +36,6 @@ The app has no queue and no cron job. Sent's `scheduled_at` field does the waiti
     <td align="center">Booked, text delivered</td>
   </tr>
 </table>
-
-## Quick start
-
-You can try everything without a Sent account. Demo mode replaces Sent with a local simulator and adds a fake customer phone to the admin page.
-
-```bash
-git clone https://github.com/parv15/sent-appointment-reminders.git
-cd sent-appointment-reminders
-npm install
-npm run demo
-```
-
-The customer portal is at <http://localhost:3000> and the admin page is at <http://localhost:3000/admin/>.
-
-To see the whole flow, book a slot on the portal, then open the admin page. The booking, its confirmation text and its scheduled reminder are all listed there. In the phone panel, click **Deliver now** on the reminder, which stands in for Sent releasing it at the reminder time. Then reply `C` and watch the booking become confirmed. Replying `R`, `hello` or `STOP` on other bookings shows the other paths.
-
-To make the demo use your own business details:
-
-```bash
-BUSINESS_NAME="Acme Dental" SERVICES="Dental checkup,Teeth cleaning" npm run demo
-```
-
-Demo data is kept in memory and is lost when the server stops.
 
 ## How it works
 
@@ -120,9 +97,15 @@ Matching ignores capital letters and surrounding spaces. A reply applies to the 
 
 Each text is `queued`, `scheduled`, `sent`, `delivered`, `failed` or `blocked`. The app learns the status in two ways, so it works before you have set up a webhook. If `SENT_DM_WEBHOOK_SECRET` is set, Sent pushes status changes to the webhook. The app also asks Sent about any message that has not reached a final state.
 
-## Run it with your Sent account
+## Getting started
 
 You need Node.js 22.13 or later and a [Sent](https://app.sent.dm) account. Light onboarding is enough to start.
+
+```bash
+git clone https://github.com/parv15/sent-appointment-reminders.git
+cd sent-appointment-reminders
+npm install
+```
 
 ### 1. Create the templates
 
@@ -171,11 +154,10 @@ Copy the `signing_secret` from the response into `SENT_DM_WEBHOOK_SECRET`. If yo
 ### 4. Run
 
 ```bash
-npm install
 npm run dev
 ```
 
-For production, build once and then start:
+The customer portal is at <http://localhost:3000> and the admin page is at <http://localhost:3000/admin/>. For production, build once and then start:
 
 ```bash
 npm run build
@@ -202,7 +184,6 @@ All settings are environment variables, usually kept in `.env`. [`.env.example`]
 | `DEFAULT_COUNTRY_CODE` | `+1` | Country code preselected on the portal |
 | `ADMIN_PASSWORD` | empty | Password for `/admin`, using HTTP basic auth with the user name `admin` |
 | `SENT_SANDBOX` | `false` | Validate requests without sending anything |
-| `DEMO_MODE` | `false` | Simulate Sent locally. `npm run demo` sets it for you |
 | `PORT` | `3000` | HTTP port |
 | `DATABASE_PATH` | `./data/appointments.db` | SQLite file |
 
@@ -244,7 +225,6 @@ src/
   app.ts          Portal, admin and webhook routes
   reminders.ts    Booking, cancelling, replies and status updates
   messenger.ts    Thin wrapper over the Sent SDK, with template fallback
-  demo.ts         Local Sent simulator for demo mode
   slots.ts        Business hours and open slots, timezone aware
   signature.ts    Webhook signature verification
   replies.ts      Reply classification

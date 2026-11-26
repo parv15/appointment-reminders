@@ -117,7 +117,7 @@ function renderBooked(b) {
   const status = b.alertStatus;
   const failed = status === 'failed' || status === 'blocked';
   const delivered = status === 'delivered' || status === 'read';
-  const rank = delivered ? 3 : status === 'sent' ? 2 : 1;
+  const rank = delivered ? 3 : status === 'sent' || status === 'routed' ? 2 : 1;
 
   $('booked-sub').textContent = !b.alertStatus
     ? 'Your appointment is confirmed.'
@@ -185,19 +185,32 @@ $('details').addEventListener('submit', async (event) => {
     return;
   }
   state.booking = result.value;
+  sessionStorage.setItem('bookingId', state.booking.id);
   if (result.value.alertError) showError(`Booked, but the text message failed: ${result.value.alertError}`);
   renderBooked(state.booking);
   poll();
 });
 
+async function selectFirstOpenDay() {
+  for (const { key } of businessDays()) {
+    const open = await attempt(() => api(`/api/slots?date=${key}`));
+    if (open.ok && open.value.slots.length > 0) {
+      await selectDate(key);
+      return;
+    }
+  }
+  await selectDate(businessDays()[0].key);
+}
+
 $('book-another').addEventListener('click', () => {
   clearTimeout(pollTimer);
+  sessionStorage.removeItem('bookingId');
   $('details').reset();
-  state = { service: config.services[0], date: state.date, slot: null, booking: null };
+  state = { service: config.services[0], date: null, slot: null, booking: null };
   renderServices();
   show(1);
-  selectDate(state.date);
   updateContinue();
+  selectFirstOpenDay();
 });
 
 async function init() {
@@ -208,11 +221,11 @@ async function init() {
   $('business').textContent = config.businessName;
   document.title = `Book with ${config.businessName}`;
   $('tz-note').textContent = `(${config.timezone.replace('_', ' ')})`;
-  const mode = $('mode');
-  if (config.demo || config.sandbox) {
+  if (config.sandbox) {
+    const mode = $('mode');
     mode.hidden = false;
-    mode.className = `mode ${config.demo ? 'demo' : 'sandbox'}`;
-    mode.textContent = config.demo ? 'Demo, Sent simulated' : 'Sandbox, nothing delivered';
+    mode.className = 'mode sandbox';
+    mode.textContent = 'Sandbox, nothing delivered';
   }
 
   const select = $('details').elements.code;
@@ -224,14 +237,16 @@ async function init() {
   renderServices();
   renderDays();
   show(1);
-  for (const { key } of businessDays()) {
-    const open = await attempt(() => api(`/api/slots?date=${key}`));
-    if (open.ok && open.value.slots.length > 0) {
-      await selectDate(key);
-      return;
-    }
+  const savedId = sessionStorage.getItem('bookingId');
+  const saved = savedId ? await api(`/api/bookings/${savedId}`).catch(() => null) : null;
+  if (saved) {
+    state.booking = saved;
+    renderBooked(saved);
+    poll();
+    return;
   }
-  await selectDate(businessDays()[0].key);
+  sessionStorage.removeItem('bookingId');
+  await selectFirstOpenDay();
 }
 
 init();

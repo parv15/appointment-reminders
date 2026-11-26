@@ -9,7 +9,6 @@
     "node": ">=22.13"
   },
   "scripts": {
-    "demo": "DEMO_MODE=true tsx src/server.ts",
     "dev": "tsx watch --env-file=.env src/server.ts",
     "build": "tsc",
     "start": "node --env-file=.env dist/server.js",
