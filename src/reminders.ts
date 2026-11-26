@@ -46,7 +46,7 @@ export type BookingResult = Appointment & { confirmationError?: string };
 export interface Reminders {
   book(request: BookingRequest): Promise<BookingResult>;
   reschedule(id: string, request: RescheduleRequest): Promise<BookingResult | undefined>;
-  cancel(id: string): Promise<Appointment | undefined>;
+  cancel(id: string): Promise<BookingResult | undefined>;
   handleInbound(payload: InboundPayload): Promise<void>;
   handleStatus(event: string, payload: { message_id?: string; channel?: string }): void;
   syncStatuses(): Promise<void>;
@@ -67,6 +67,9 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
     const { date, time } = formatInZone(appointment.startsAt);
     return { customer_name: appointment.name, business_name: config.businessName, appointment_date: date, appointment_time: time };
   };
+
+  const pick = (all: Record<string, string>, fields?: string[]) =>
+    fields ? Object.fromEntries(Object.entries(all).filter(([key]) => fields.includes(key))) : all;
 
   const reply = async (to: string, channel: string | undefined, text: string) => {
     try {
@@ -115,12 +118,12 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
     });
   }
 
-  async function sendNotice(appointment: Appointment, templateName: string, key: string, extra: Record<string, string> = {}) {
+  async function sendNotice(appointment: Appointment, templateName: string, key: string, extra: Record<string, string> = {}, fields?: string[]) {
     if (!templateName) return undefined;
     try {
       return await messenger.send({
         to: appointment.phone,
-        template: { name: templateName, parameters: { ...textParameters(appointment), ...extra } },
+        template: { name: templateName, parameters: pick({ ...textParameters(appointment), ...extra }, fields) },
         idempotencyKey: key,
       });
     } catch (err) {
@@ -228,7 +231,15 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
         await messenger.cancel(appointment.reminderMessageId);
       }
       store.setStatus(id, 'cancelled');
-      return store.get(id);
+
+      let confirmationError: string | undefined;
+      try {
+        const messageId = await sendNotice(appointment, config.cancellationTemplateName, `cancel-${id}`, {}, ['customer_name', 'appointment_date']);
+        if (messageId) store.setConfirmation(id, messageId);
+      } catch (err) {
+        confirmationError = err instanceof NoticeError ? err.message : 'The cancellation text could not be sent.';
+      }
+      return { ...store.get(id)!, ...(confirmationError && { confirmationError }) };
     },
 
     async handleInbound(payload) {

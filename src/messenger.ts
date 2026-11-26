@@ -34,6 +34,7 @@ export interface TemplateLists {
   reminder: string;
   confirmation: string;
   reschedule: string;
+  cancellation: string;
 }
 
 const STATUS_TTL_MS = 5 * 60_000;
@@ -42,6 +43,7 @@ const PURPOSES: Record<keyof TemplateLists, string> = {
   reminder: 'Reminder',
   confirmation: 'Booking confirmation',
   reschedule: 'Reschedule notice',
+  cancellation: 'Cancellation notice',
 };
 
 const names = (list: string) => list.split(',').map((n) => n.trim()).filter(Boolean);

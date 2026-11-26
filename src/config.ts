@@ -6,6 +6,7 @@ export interface Config {
   templateName: string;
   confirmationTemplateName: string;
   rescheduleTemplateName: string;
+  cancellationTemplateName: string;
   businessName: string;
   services: string[];
   defaultCountryCode: string;
@@ -117,6 +118,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     templateName: env.SENT_TEMPLATE_NAME ?? 'appointment_reminder_reply,sent_Appointment_Reminder_2',
     confirmationTemplateName: env.SENT_CONFIRMATION_TEMPLATE ?? 'appointment_confirmation_reply,sent_Appointment_Confirmation_1',
     rescheduleTemplateName: env.SENT_RESCHEDULE_TEMPLATE ?? 'sent_Appointment_Reschedule_1',
+    cancellationTemplateName: env.SENT_CANCEL_TEMPLATE ?? 'sent_Appointment_Cancelled',
     businessName,
     services,
     defaultCountryCode,

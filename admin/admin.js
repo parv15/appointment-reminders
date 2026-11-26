@@ -95,11 +95,13 @@ function renderList() {
       const cancel = el('button', 'btn btn-sm btn-ghost btn-danger', 'Cancel');
       cancel.type = 'button';
       cancel.addEventListener('click', async () => {
-        if (!confirm(`Cancel ${a.name}'s appointment? Their scheduled reminder is cancelled too.`)) return;
+        if (!confirm(`Cancel ${a.name}'s appointment? Their scheduled reminder is cancelled too, and they get a text saying so.`)) return;
         cancel.disabled = true;
         const result = await attempt(() => api(`/api/admin/appointments/${a.id}/cancel`, { method: 'POST' }));
-        if (result.ok) refresh();
-        else cancel.disabled = false;
+        if (result.ok) {
+          if (result.value.confirmationError) showError(`Cancelled, but the customer text failed: ${result.value.confirmationError}`);
+          refresh();
+        } else cancel.disabled = false;
       });
       actions.append(move, cancel);
     }

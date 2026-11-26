@@ -24,7 +24,7 @@ function readConfig(): Config {
 async function connectToSent(config: Config) {
   const sent = createSentMessenger({
     sandbox: config.sandbox,
-    templates: { reminder: config.templateName, confirmation: config.confirmationTemplateName, reschedule: config.rescheduleTemplateName },
+    templates: { reminder: config.templateName, confirmation: config.confirmationTemplateName, reschedule: config.rescheduleTemplateName, cancellation: config.cancellationTemplateName },
   });
 
   try {

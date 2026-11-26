@@ -88,7 +88,7 @@ Customers choose when the reminder is sent, from options such as 1 day, 2 hours 
 
 Replies are handled automatically. `C` confirms the booking, `R` asks for a new time, and anything else gets a text explaining the options. `STOP` and the other compliance keywords stay with Sent.
 
-The admin dashboard counts bookings that asked to reschedule and bookings that have not replied as the appointment gets close, and it highlights them. A dialog moves a booking to a new slot, cancels the old reminder, schedules a new one and tells the customer. Every confirmation and reminder shows its status and the channel that carried it.
+The admin dashboard counts bookings that asked to reschedule and bookings that have not replied as the appointment gets close, and it highlights them. A dialog moves a booking to a new slot, cancels the old reminder, schedules a new one and tells the customer. Cancelling a booking stops its reminder and sends the customer a cancellation text. Every confirmation and reminder shows its status and the channel that carried it.
 
 The dashboard sits behind a sign-in page with a password. Two setup scripts create the templates and register the webhook, so the first run needs few manual steps.
 
@@ -294,6 +294,7 @@ try {
 | An appointment is cancelled, rescheduled or answered after the booking page loaded | The page keeps checking and shows the new state. It says plainly when the appointment was cancelled. |
 | The reminder to cancel was already sent or no longer exists | Cancelling still succeeds, because there is nothing left to cancel at Sent. |
 | A time that does not exist or occurs twice because of daylight saving | The slot list skips it, so every offered time is a real local time exactly once. |
+| The cancellation or reschedule text fails | The cancel or move still happens, and the dashboard shows that the customer text failed. |
 | Staff reschedule to the time the booking already has | Nothing changes and no new texts are sent. |
 | An appointment time has passed | It moves to the Past tab and stops counting as upcoming or as needing attention. |
 | Cancelling the old reminder fails during a reschedule | The new reminder is cancelled again and nothing changes. |
@@ -321,6 +322,7 @@ All settings are environment variables, usually kept in `.env`. [`.env.example`]
 | `SENT_TEMPLATE_NAME` | `appointment_reminder_reply,sent_Appointment_Reminder_2` | Reminder template list. The first `APPROVED` one is used. |
 | `SENT_CONFIRMATION_TEMPLATE` | `appointment_confirmation_reply,sent_Appointment_Confirmation_1` | Booking confirmation template list. Leave it empty to turn the confirmation off. |
 | `SENT_RESCHEDULE_TEMPLATE` | `sent_Appointment_Reschedule_1` | Text sent when staff reschedule. Leave it empty to turn it off. |
+| `SENT_CANCEL_TEMPLATE` | `sent_Appointment_Cancelled` | Text sent when staff cancel. Leave it empty to turn it off. |
 | `REMINDER_OPTIONS` | `1440,120,60` | Reminder times customers can choose, in minutes before the appointment. |
 | `NO_REPLY_WARNING_HOURS` | `3` | How long before the appointment a booking without a reply is flagged. |
 | `SERVICES` | `Appointment` | Comma-separated list of services customers can book. |
@@ -361,7 +363,7 @@ These endpoints belong to the admin dashboard. Everything except the three sign-
 | `GET` | `/api/admin/activity` | The alerts and activity feed. |
 | `GET` | `/api/admin/templates` | Which templates are preferred and which are in use. |
 | `POST` | `/api/admin/appointments/:id/reschedule` | Moves a booking. The body has `startsAt` and an optional `reminderMinutes`. |
-| `POST` | `/api/admin/appointments/:id/cancel` | Cancels a booking and its scheduled reminder. |
+| `POST` | `/api/admin/appointments/:id/cancel` | Cancels a booking and its scheduled reminder, and texts the customer. |
 
 ```bash
 curl "http://localhost:3000/api/slots?date=2026-12-03"
