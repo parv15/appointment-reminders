@@ -27,6 +27,7 @@ export interface Messenger {
   status(messageId: string): Promise<MessageStatus>;
   templateReport(): Promise<TemplateReport[]>;
   verify(): Promise<string[]>;
+  twoWay(): Promise<boolean>;
 }
 
 export interface TemplateLists {
@@ -49,6 +50,7 @@ export function createSentMessenger(options: { sandbox: boolean; templates: Temp
   const client = new SentDm({ timeout: 15_000 });
   const { sandbox, templates } = options;
 
+  let twoWayCache: { value: boolean; at: number } | undefined;
   let statuses = new Map<string, string | undefined>();
   let loadedAt = 0;
 
@@ -130,6 +132,15 @@ export function createSentMessenger(options: { sandbox: boolean; templates: Temp
       return report;
     },
 
+    async twoWay() {
+      if (sandbox) return true;
+      if (twoWayCache && Date.now() - twoWayCache.at < STATUS_TTL_MS) return twoWayCache.value;
+      const channels = (await client.channels.list()).data;
+      const value = Boolean(channels?.sms?.length || channels?.whatsapp || channels?.rcs);
+      twoWayCache = { value, at: Date.now() };
+      return value;
+    },
+
     async verify() {
       const warnings: string[] = [];
       const known = await templateStatuses(true);
@@ -145,6 +156,9 @@ export function createSentMessenger(options: { sandbox: boolean; templates: Temp
         } else if (approved !== candidates[0]) {
           warnings.push(`Using "${approved}" for ${purpose} until "${candidates[0]}" is approved (it is ${known.get(candidates[0]!) ?? 'missing'}).`);
         }
+      }
+      if (!(await this.twoWay().catch(() => true))) {
+        warnings.push('Your Sent account has no SMS number, WhatsApp or RCS channel of its own. Texts are sent one way and customers cannot reply, so C and R replies will not arrive until you set up a channel in the Sent dashboard.');
       }
       if (sandbox) {
         warnings.push('SENT_SANDBOX is true: requests are validated but nothing is delivered.');

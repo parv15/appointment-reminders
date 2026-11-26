@@ -141,7 +141,7 @@ function renderBooked(b) {
 
   $('booked-title').textContent = BOOKED_TITLES[b.status] ?? BOOKED_TITLES.scheduled;
   $('booked-check').classList.toggle('off', cancelled);
-  $('reply-guide').hidden = cancelled;
+  $('reply-guide').hidden = cancelled || config.repliesPossible === false;
   $('booked-sub').textContent = cancelled
     ? 'The clinic cancelled this appointment. You can book another time below.'
     : b.status === 'reschedule_requested'
@@ -159,7 +159,7 @@ function renderBooked(b) {
   $('d-phone').textContent = b.phone;
   $('alert-error').hidden = !failed;
   $('alert-error').textContent = failed ? `Delivery status: ${status}. Check the number, then book again.` : '';
-  $('reminder-note').textContent = `We will text you a reminder on ${reminderTime(b.startsAt, b.reminderMinutes)}, ${duration(b.reminderMinutes)} before your appointment. You can reply to that message to confirm or to reschedule.`;
+  $('reminder-note').textContent = `We will text you a reminder on ${reminderTime(b.startsAt, b.reminderMinutes)}, ${duration(b.reminderMinutes)} before your appointment.${config.repliesPossible === false ? '' : ' You can reply to that message to confirm or to reschedule.'}`;
 
   renderPreview();
   renderChecks(b);

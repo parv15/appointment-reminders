@@ -46,8 +46,8 @@ const publicView = (a: Appointment, defaultLeadMinutes: number) => ({
   reminderStatus: a.reminderMessageId ? (a.reminderStatus ?? 'queued') : null,
 });
 
-export function createApp(deps: { store: Store; reminders: Reminders; config: Config; templateReport?: () => Promise<TemplateReport[]> }) {
-  const { store, reminders, config, templateReport } = deps;
+export function createApp(deps: { store: Store; reminders: Reminders; config: Config; templateReport?: () => Promise<TemplateReport[]>; twoWay?: () => Promise<boolean> }) {
+  const { store, reminders, config, templateReport, twoWay } = deps;
   const app = express();
   const auth = createAdminAuth(config.adminPassword);
   const bookingLimiter = createRateLimiter(config.bookingsPerHourPerIp, 60 * 60_000);
@@ -117,8 +117,10 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
   app.get('/api/config', async (_req, res) => {
     const templates = templateReport ? await templateReport().catch(() => []) : [];
     const repliesInText = templates.length > 0 && templates.every((t) => t.using === t.preferred && t.preferredStatus === 'APPROVED');
+    const repliesPossible = twoWay ? await twoWay().catch(() => true) : true;
     res.json({
       repliesInText,
+      repliesPossible,
       sandbox: config.sandbox,
       businessName: config.businessName,
       services: config.services,

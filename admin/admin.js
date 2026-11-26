@@ -142,15 +142,23 @@ function renderFeed(items) {
 
 function renderNotice(templates) {
   const stale = templates.filter((t) => t.using !== t.preferred);
-  $('notice').hidden = stale.length === 0;
-  if (stale.length === 0) return;
+  const parts = [];
 
-  const lines = stale.map((t) => `${t.purpose}: "${t.preferred}" is ${t.preferredStatus.toLowerCase()}, so texts use "${t.using}" for now.`);
-  $('notice').replaceChildren(
-    el('strong', '', 'Your texts do not tell customers how to reply yet'),
-    el('span', '', 'Your own templates are waiting for approval from Sent. Until then the standard templates are used, and they leave out "Reply C to confirm or R to reschedule". The app switches over by itself once yours are approved.'),
-    ...lines.map((line) => el('span', 'muted', line)),
-  );
+  if (config.repliesPossible === false) {
+    parts.push(
+      el('strong', '', 'Customers cannot reply to your texts yet'),
+      el('span', '', 'Your Sent account has no SMS number, WhatsApp or RCS channel of its own, so texts go out one way. Set up a channel in the Sent dashboard before you rely on C and R replies.'),
+    );
+  }
+  if (stale.length > 0) {
+    parts.push(
+      el('strong', '', 'Your texts do not tell customers how to reply yet'),
+      el('span', '', 'Your own templates are waiting for approval from Sent. Until then the standard templates are used, and they leave out "Reply C to confirm or R to reschedule". The app switches over by itself once yours are approved.'),
+      ...stale.map((t) => el('span', 'muted', `${t.purpose}: "${t.preferred}" is ${t.preferredStatus.toLowerCase()}, so texts use "${t.using}" for now.`)),
+    );
+  }
+  $('notice').hidden = parts.length === 0;
+  $('notice').replaceChildren(...parts);
 }
 
 async function refresh() {

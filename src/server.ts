@@ -60,7 +60,7 @@ try {
 const messenger = await connectToSent(config);
 const reminders = createReminders({ store, messenger, config });
 
-const server = createApp({ store, reminders, config, templateReport: () => messenger.templateReport() }).listen(config.port, (err?: NodeJS.ErrnoException) => {
+const server = createApp({ store, reminders, config, templateReport: () => messenger.templateReport(), twoWay: () => messenger.twoWay() }).listen(config.port, (err?: NodeJS.ErrnoException) => {
   if (err) {
     fail(err.code === 'EADDRINUSE' ? `Port ${config.port} is already in use. Set PORT to another value.` : `Cannot listen on port ${config.port}: ${err.message}`);
   }
