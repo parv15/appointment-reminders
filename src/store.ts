@@ -1,0 +1,121 @@
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+import { randomUUID } from 'node:crypto';
+
+export type AppointmentStatus = 'scheduled' | 'confirmed' | 'reschedule_requested' | 'cancelled';
+
+export interface Appointment {
+  id: string;
+  name: string;
+  phone: string;
+  startsAt: string;
+  status: AppointmentStatus;
+  reminderMessageId: string | null;
+  reminderStatus: string | null;
+  createdAt: string;
+}
+
+interface Row {
+  id: string;
+  name: string;
+  phone: string;
+  starts_at: string;
+  status: AppointmentStatus;
+  reminder_message_id: string | null;
+  reminder_status: string | null;
+  created_at: string;
+}
+
+const toAppointment = (row: Row): Appointment => ({
+  id: row.id,
+  name: row.name,
+  phone: row.phone,
+  startsAt: row.starts_at,
+  status: row.status,
+  reminderMessageId: row.reminder_message_id,
+  reminderStatus: row.reminder_status,
+  createdAt: row.created_at,
+});
+
+export class Store {
+  private readonly db: DatabaseSync;
+
+  constructor(path: string) {
+    if (path !== ':memory:') {
+      mkdirSync(dirname(path), { recursive: true });
+    }
+    this.db = new DatabaseSync(path);
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS appointments (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        starts_at TEXT NOT NULL,
+        status TEXT NOT NULL,
+        reminder_message_id TEXT,
+        reminder_status TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS appointments_phone ON appointments (phone);
+      CREATE INDEX IF NOT EXISTS appointments_reminder ON appointments (reminder_message_id);
+      CREATE TABLE IF NOT EXISTS seen_events (id TEXT PRIMARY KEY);
+    `);
+  }
+
+  create(input: { name: string; phone: string; startsAt: string }): Appointment {
+    const appointment: Appointment = {
+      id: randomUUID(),
+      ...input,
+      status: 'scheduled',
+      reminderMessageId: null,
+      reminderStatus: null,
+      createdAt: new Date().toISOString(),
+    };
+    this.db
+      .prepare(
+        'INSERT INTO appointments (id, name, phone, starts_at, status, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      )
+      .run(appointment.id, appointment.name, appointment.phone, appointment.startsAt, appointment.status, appointment.createdAt);
+    return appointment;
+  }
+
+  get(id: string): Appointment | undefined {
+    const row = this.db.prepare('SELECT * FROM appointments WHERE id = ?').get(id) as Row | undefined;
+    return row && toAppointment(row);
+  }
+
+  list(): Appointment[] {
+    const rows = this.db.prepare('SELECT * FROM appointments ORDER BY starts_at ASC').all() as unknown as Row[];
+    return rows.map(toAppointment);
+  }
+
+  findUpcomingByPhone(phone: string, now: Date): Appointment | undefined {
+    const rows = this.db
+      .prepare("SELECT * FROM appointments WHERE phone = ? AND status != 'cancelled' ORDER BY starts_at ASC")
+      .all(phone) as unknown as Row[];
+    const upcoming = rows.map(toAppointment).find((a) => new Date(a.startsAt) > now);
+    return upcoming;
+  }
+
+  setReminder(id: string, messageId: string): void {
+    this.db.prepare("UPDATE appointments SET reminder_message_id = ?, reminder_status = 'queued' WHERE id = ?").run(messageId, id);
+  }
+
+  setStatus(id: string, status: AppointmentStatus): void {
+    this.db.prepare('UPDATE appointments SET status = ? WHERE id = ?').run(status, id);
+  }
+
+  setReminderStatus(messageId: string, status: string): void {
+    this.db.prepare('UPDATE appointments SET reminder_status = ? WHERE reminder_message_id = ?').run(status, messageId);
+  }
+
+  markEventSeen(eventId: string): boolean {
+    const result = this.db.prepare('INSERT OR IGNORE INTO seen_events (id) VALUES (?)').run(eventId);
+    return result.changes > 0;
+  }
+
+  close(): void {
+    this.db.close();
+  }
+}

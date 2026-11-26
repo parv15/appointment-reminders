@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Appointment reminders</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="banner" hidden>Demo mode: Sent is simulated locally. Nothing is sent to a real phone.</div>
+  <div class="layout">
+    <main>
+      <header>
+        <h1>Appointment reminders</h1>
+        <p>Book an appointment. Sent schedules the reminder, and a reply of <b>C</b> or <b>R</b> updates the status.</p>
+      </header>
+
+      <form id="booking">
+        <label>Name <input name="name" required autocomplete="off"></label>
+        <label>Phone <input name="phone" placeholder="+14155551234" required autocomplete="off"></label>
+        <label>Starts at <input name="startsAt" type="datetime-local" required></label>
+        <button type="submit">Book</button>
+        <p id="error" role="alert" hidden></p>
+      </form>
+
+      <table>
+        <thead>
+          <tr><th>Name</th><th>Phone</th><th>Starts</th><th>Status</th><th>Reminder</th><th></th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <p id="empty" hidden>No appointments yet.</p>
+    </main>
+
+    <aside id="phone" hidden>
+      <h2>Customer phone</h2>
+      <div id="thread"></div>
+      <form id="reply">
+        <input name="text" placeholder="Type a reply" autocomplete="off" required>
+        <button type="submit">Send</button>
+      </form>
+      <div class="quick">
+        <button type="button" data-text="C">C</button>
+        <button type="button" data-text="R">R</button>
+        <button type="button" data-text="STOP">STOP</button>
+        <button type="button" data-text="hello">hello</button>
+      </div>
+      <p id="phone-hint"></p>
+    </aside>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

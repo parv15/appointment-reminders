@@ -1,0 +1,39 @@
+:root { color-scheme: light dark; --accent: #2563eb; --border: #8884; }
+* { box-sizing: border-box; }
+body { margin: 0; font: 15px/1.5 system-ui, sans-serif; }
+main { max-width: 860px; margin: 0 auto; padding: 32px 20px; }
+h1 { margin: 0 0 4px; font-size: 24px; }
+header p { margin: 0 0 24px; opacity: .7; }
+form { display: grid; grid-template-columns: repeat(3, 1fr) auto; gap: 12px; align-items: end; margin-bottom: 32px; }
+label { display: grid; gap: 4px; font-size: 13px; }
+input { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font: inherit; background: transparent; color: inherit; }
+button { padding: 9px 18px; border: 0; border-radius: 6px; background: var(--accent); color: #fff; font: inherit; cursor: pointer; }
+button.link { background: none; color: var(--accent); padding: 0; }
+#error { grid-column: 1 / -1; margin: 0; color: #dc2626; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; opacity: .6; }
+.pill { padding: 2px 8px; border-radius: 999px; font-size: 12px; background: var(--border); }
+.pill.confirmed { background: #16a34a33; }
+.pill.reschedule_requested { background: #d9770633; }
+.pill.cancelled { background: #dc262633; }
+@media (max-width: 700px) { form { grid-template-columns: 1fr; } }
+#banner { padding: 8px 20px; text-align: center; font-size: 13px; background: #d9770633; }
+.layout { display: grid; grid-template-columns: 1fr; max-width: 1200px; margin: 0 auto; }
+.layout:has(aside:not([hidden])) { grid-template-columns: 1fr 340px; }
+main { max-width: none; width: 100%; }
+form { grid-template-columns: repeat(2, 1fr) ; }
+form button[type="submit"] { grid-column: 1 / -1; }
+aside { margin: 32px 20px 32px 0; padding: 16px; border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; gap: 12px; height: fit-content; position: sticky; top: 16px; }
+aside h2 { margin: 0; font-size: 15px; }
+#thread { display: flex; flex-direction: column; gap: 8px; min-height: 200px; max-height: 420px; overflow-y: auto; }
+.bubble { max-width: 85%; padding: 8px 12px; border-radius: 14px; font-size: 14px; background: var(--border); align-self: flex-start; }
+.bubble.inbound { align-self: flex-end; background: var(--accent); color: #fff; }
+.bubble small { display: block; opacity: .7; margin-top: 4px; font-size: 11px; }
+.bubble button { margin-top: 6px; padding: 3px 10px; font-size: 12px; }
+#reply { display: flex; gap: 8px; margin: 0; }
+#reply input { flex: 1; }
+.quick { display: flex; gap: 6px; }
+.quick button { background: var(--border); color: inherit; padding: 4px 12px; }
+#phone-hint { margin: 0; font-size: 12px; opacity: .6; }
+.thread-empty { opacity: .5; font-size: 13px; }
