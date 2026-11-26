@@ -128,7 +128,7 @@ function renderBooked(b) {
   [...$('track').children].forEach((li, i) => li.classList.toggle('on', !failed && i < rank));
   $('alert-error').hidden = !failed;
   $('alert-error').textContent = failed ? `Delivery status: ${status}. Check the number and try again from the admin dashboard.` : '';
-  $('reminder-note').textContent = `We will also text you a reminder ${config.reminderLeadMinutes >= 1440 ? `${Math.round(config.reminderLeadMinutes / 1440)} day before` : `${Math.round(config.reminderLeadMinutes / 60)} hours before`}.`;
+  $('reminder-note').textContent = `We will text you a reminder ${config.reminderLeadMinutes >= 1440 ? `${Math.round(config.reminderLeadMinutes / 1440)} day before` : `${Math.round(config.reminderLeadMinutes / 60)} hours before`}. Just reply to that message.`;
   show(3);
   return delivered || failed;
 }

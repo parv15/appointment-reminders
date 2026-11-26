@@ -106,7 +106,9 @@ curl -X POST https://api.sent.dm/v3/templates \
 
 WhatsApp templates go through Meta review and RCS templates through the RCS sender profile. The app warns at startup while the template is not `APPROVED`.
 
-Want to start before approval? Every Sent account has the approved template `sent_Appointment_Reminder_2`, which takes the same four variables. Set `SENT_TEMPLATE_NAME=sent_Appointment_Reminder_2`. It has no "Reply C or R" line, so customers will not know to reply.
+Create `appointment_confirmation_reply` the same way. Its body is Sent's `sent_Appointment_Confirmation_1` text plus "Reply C to confirm you will attend or R to reschedule.", with variables `customer_name`, `business_name`, `service_name`, `appointment_date`, `appointment_time`.
+
+Until they are approved, the app falls back to Sent's pre-approved `sent_Appointment_Reminder_2` and `sent_Appointment_Confirmation_1` (see the template lists below). Those texts have no reply instructions, so the booking page also tells customers how to reply. Once yours are approved, the app switches on its own.
 
 ### 2. Configure
 
@@ -120,8 +122,8 @@ cp .env.example .env
 | `SENT_DM_API_KEY` | required | API key from the Sent dashboard |
 | `BUSINESS_NAME` | required | Business name shown in the reminder, for example `Acme Dental` |
 | `SENT_DM_WEBHOOK_SECRET` | empty | Signing secret from step 3. Without it, customer replies are ignored. Delivery status is still tracked by polling Sent |
-| `SENT_TEMPLATE_NAME` | `appointment_reminder_reply` | Template used for reminders |
-| `SENT_CONFIRMATION_TEMPLATE` | `sent_Appointment_Confirmation_1` | Template for the alert sent the moment an appointment is booked. Set empty to turn the alert off |
+| `SENT_TEMPLATE_NAME` | `appointment_reminder_reply,sent_Appointment_Reminder_2` | Template for reminders. A comma-separated list: the first one that is `APPROVED` is used, checked every five minutes |
+| `SENT_CONFIRMATION_TEMPLATE` | `appointment_confirmation_reply,sent_Appointment_Confirmation_1` | Template for the alert sent the moment an appointment is booked, same list rule. Set empty to turn the alert off |
 | `SERVICES` | `Appointment` | Comma-separated services customers can book, for example `Dental checkup,Teeth cleaning` |
 | `DEFAULT_COUNTRY_CODE` | `+1` | Country code preselected on the portal |
 | `BOOKING_START_HOUR` / `BOOKING_END_HOUR` | `9` / `17` | Bookable hours in `BUSINESS_TIMEZONE` |

@@ -22,7 +22,7 @@ export class DemoMessenger implements Messenger {
     const body =
       request.text ??
       (p?.service_name
-        ? `Hello ${p.customer_name},\n\nThank you for booking with ${p.business_name}.\n\nYour appointment for ${p.service_name} on ${p.appointment_date} at ${p.appointment_time} is confirmed.`
+        ? `Hello ${p.customer_name},\n\nThank you for booking with ${p.business_name}.\n\nYour appointment for ${p.service_name} on ${p.appointment_date} at ${p.appointment_time} is confirmed.\n\nReply C to confirm you will attend or R to reschedule.`
         : `Hello ${p?.customer_name}, this is a reminder about your upcoming appointment with ${p?.business_name} on ${p?.appointment_date} at ${p?.appointment_time}. Reply C to confirm or R to reschedule.`);
     const scheduled = request.scheduledAt !== undefined;
     const message: DemoMessage = {
