@@ -69,7 +69,7 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
     }
 
     const eventId = header(req, 'id');
-    if (!store.claimEvent(eventId)) {
+    if (!(await store.claimEvent(eventId))) {
       res.json({ received: true, duplicate: true });
       return;
     }
@@ -90,12 +90,12 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
             await reminders.handleInbound(payload as unknown as InboundPayload);
           }
         } else {
-          reminders.handleStatus(event.event, payload as { message_id?: string; channel?: string });
+          await reminders.handleStatus(event.event, payload as { message_id?: string; channel?: string });
         }
       }
       res.json({ received: true });
     } catch (err) {
-      store.releaseEvent(eventId);
+      await store.releaseEvent(eventId);
       const explained = explainSentError(err);
       console.error(`Webhook ${eventId} failed: ${explained?.message ?? (err instanceof Error ? err.message : err)}`);
       res.status(500).json({ error: 'The event could not be processed. It can be delivered again.' });
@@ -133,11 +133,11 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
     });
   });
 
-  app.get('/api/slots', (req, res) => {
+  app.get('/api/slots', async (req, res) => {
     const date = String(req.query.date ?? '');
     if (!isRealDate(date)) throw new ValidationError('Pick a valid date.');
     const exclude = typeof req.query.exclude === 'string' ? req.query.exclude : undefined;
-    const slots = availableSlots(date, config.slotRules, store.takenStarts(exclude), new Date());
+    const slots = availableSlots(date, config.slotRules, (await store.takenStarts(exclude)), new Date());
     res.json({ date, slots: slots.map((s) => s.toISOString()) });
   });
 
@@ -156,8 +156,8 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
     }
     const start = parseStart(startsAt, 'Pick a date and time.');
     const minutes = optionalMinutes(reminderMinutes);
-    const repeat = store.findActive(phone, start.toISOString());
-    const open = availableSlots(localDate(start, config.timezone), config.slotRules, store.takenStarts(), new Date());
+    const repeat = await store.findActive(phone, start.toISOString());
+    const open = availableSlots(localDate(start, config.timezone), config.slotRules, await store.takenStarts(), new Date());
     if (!repeat && !open.some((s) => s.getTime() === start.getTime())) {
       throw new ValidationError('That time is no longer available. Please pick another slot.', 'slot_unavailable');
     }
@@ -168,7 +168,7 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
 
   app.get('/api/bookings/:id', async (req, res) => {
     await reminders.syncStatuses();
-    const booking = store.get(req.params.id);
+    const booking = await store.get(req.params.id);
     if (!booking) {
       res.status(404).json({ error: 'Booking not found.' });
       return;
@@ -186,7 +186,7 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
   app.get('/api/admin/appointments', async (_req, res) => {
     await reminders.syncStatuses();
     const now = new Date();
-    res.json(store.list().map((a) => ({ ...a, attention: attentionFor(a, now, config.noReplyWarningHours) })));
+    res.json((await store.list()).map((a) => ({ ...a, attention: attentionFor(a, now, config.noReplyWarningHours) })));
   });
 
   app.get('/api/admin/templates', async (_req, res) => {
@@ -198,7 +198,7 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
     const start = parseStart(startsAt, 'Pick a date and time.');
     const minutes = optionalMinutes(reminderMinutes);
 
-    const open = availableSlots(localDate(start, config.timezone), config.slotRules, store.takenStarts(req.params.id), new Date());
+    const open = availableSlots(localDate(start, config.timezone), config.slotRules, await store.takenStarts(req.params.id), new Date());
     if (!open.some((s) => s.getTime() === start.getTime())) {
       throw new ValidationError('That time is not available. Pick another slot.', 'slot_unavailable');
     }
@@ -211,8 +211,8 @@ export function createApp(deps: { store: Store; reminders: Reminders; config: Co
     res.json(moved);
   });
 
-  app.get('/api/admin/activity', (_req, res) => {
-    res.json(buildActivity(store.list(), config.reminderOptions[0]!));
+  app.get('/api/admin/activity', async (_req, res) => {
+    res.json(buildActivity(await store.list(), config.reminderOptions[0]!));
   });
 
   app.post('/api/admin/appointments/:id/cancel', async (req, res) => {

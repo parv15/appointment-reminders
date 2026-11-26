@@ -15,10 +15,11 @@ This project is a booking portal and an admin dashboard for businesses that take
 </p>
 
 <p>
+  <a href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fparv15%2Fsent-appointment-reminders&project-name=sent-appointment-reminders&repository-name=sent-appointment-reminders&env=SENT_DM_API_KEY,BUSINESS_NAME,ADMIN_PASSWORD,DATABASE_URL&envDescription=Your%20Sent%20API%20key%2C%20your%20business%20name%2C%20an%20admin%20password%20and%20a%20Postgres%20connection%20string&envLink=https%3A%2F%2Fgithub.com%2Fparv15%2Fsent-appointment-reminders%23one-click-deploy"><img alt="Deploy with Vercel" src="https://vercel.com/button"></a>
   <a href="https://render.com/deploy?repo=https://github.com/parv15/sent-appointment-reminders"><img alt="Deploy to Render" src="https://render.com/images/deploy-to-render-button.svg"></a>
 </p>
 
-The button creates a Render web service from [`render.yaml`](render.yaml) with a persistent disk for the booking database. Render asks you for your Sent API key, your business name and an admin password, and the steps after that are listed under [One-click deploy](#one-click-deploy).
+Both buttons deploy the app with your own Postgres database, because neither Vercel nor Render keeps files between restarts on a free plan. The steps are listed under [One-click deploy](#one-click-deploy).
 
 ## The problem
 
@@ -49,13 +50,13 @@ The recording scrolls through the booking portal and then the admin dashboard. I
 
 ## How it works
 
-One Node process serves the booking portal, the admin dashboard and the webhook endpoint. Bookings are stored in a local SQLite file, and everything that reaches a phone goes through Sent.
+One Node process serves the booking portal, the admin dashboard and the webhook endpoint. Bookings are stored in a local SQLite file or in Postgres, and everything that reaches a phone goes through Sent.
 
 ```mermaid
 flowchart TB
     customer([Customer]) -->|books a slot| app["This app<br/>portal, admin, webhook"]
     staff([Staff]) -->|reschedules or cancels| app
-    app <--> db[("SQLite")]
+    app <--> db[("SQLite or Postgres")]
     app -->|"confirmation now,<br/>reminder with scheduled_at"| sent["Sent API"]
     sent -->|"SMS, WhatsApp or RCS"| phone([Customer phone])
     phone -->|"C or R"| sent
@@ -104,7 +105,7 @@ The dashboard sits behind a sign-in page with a password. Two setup scripts crea
 | --- | --- |
 | Runtime | Node.js 22.13 or later, TypeScript in strict mode |
 | Server | Express 5 |
-| Data | SQLite through `node:sqlite`, with no native build step |
+| Data | SQLite through `node:sqlite` by default, or Postgres through `pg` when `DATABASE_URL` is set |
 | Messaging | [`@sentdm/sentdm`](https://www.npmjs.com/package/@sentdm/sentdm) 0.55, the official TypeScript SDK |
 | Frontend | Plain HTML, CSS and JavaScript, with the Inter variable font bundled |
 | Tooling | GitHub Actions for typecheck and build, Dependabot and Docker |
@@ -341,7 +342,8 @@ All settings are environment variables, usually kept in `.env`. [`.env.example`]
 | `TRUST_PROXY` | empty | Set to the number of proxies in front of the app, for example `1`, so that rate limits use the real visitor address. Leave it empty when the app is exposed directly. |
 | `SENT_SANDBOX` | `false` | Validates requests without sending anything. |
 | `PORT` | `3000` | HTTP port. |
-| `DATABASE_PATH` | `./data/appointments.db` | SQLite file. |
+| `DATABASE_URL` | empty | Postgres connection string. When it is set the app uses Postgres, and the `POSTGRES_URL` that Vercel sets works too. |
+| `DATABASE_PATH` | `./data/appointments.db` | SQLite file, used when `DATABASE_URL` is empty. |
 
 ## API
 
@@ -383,56 +385,78 @@ curl -X POST http://localhost:3000/api/bookings \
 
 ```text
 src/
-  server.ts       Entry point: config, startup checks and shutdown
-  app.ts          Portal, admin and webhook routes
-  reminders.ts    Booking, rescheduling, cancelling, replies and status updates
-  messenger.ts    The Sent SDK wrapper, with template fallback
-  slots.ts        Business hours and open slots, timezone aware
-  attention.ts    Which bookings need staff attention
-  activity.ts     The alerts and activity feed
-  auth.ts         Admin sign-in, session cookie and login rate limit
-  signature.ts    Webhook signature verification
-  replies.ts      Reply classification
-  errors.ts       Turns Sent API errors into readable messages
-  config.ts       Environment validation
-  store.ts        SQLite storage
-public/           Booking portal, admin sign-in page, shared styles, slot picker and font
-admin/            Admin dashboard
-scripts/          setup:templates and setup:webhook
-docs/             Template definitions, diagrams, screenshots and the demo recording
+  server.ts            Entry point: starts the server and handles shutdown
+  bootstrap.ts         Builds the app from the environment, for the server and for Vercel
+  vercel.ts            Serverless entry used by api/index.js
+  app.ts               Portal, admin and webhook routes
+  reminders.ts         Booking, rescheduling, cancelling, replies and status updates
+  messenger.ts         The Sent SDK wrapper, with template fallback
+  slots.ts             Business hours and open slots, timezone aware
+  attention.ts         Which bookings need staff attention
+  activity.ts          The alerts and activity feed
+  auth.ts              Admin sign-in, session cookie and login rate limit
+  rate-limit.ts        Booking rate limit
+  signature.ts         Webhook signature verification
+  replies.ts           Reply classification
+  errors.ts            Turns Sent API errors into readable messages
+  config.ts            Environment validation
+  store.ts             The storage interface and shared types
+  sqlite-store.ts      SQLite storage
+  postgres-store.ts    Postgres storage
+api/index.js           Vercel function entry
+vercel.json            Vercel build and routing settings
+render.yaml            Render blueprint
+public/                Booking portal, admin sign-in page, shared styles, slot picker and font
+admin/                 Admin dashboard
+scripts/               setup:templates, setup:webhook and the prose check
+docs/                  Template definitions, diagrams, screenshots and the demo recording
 ```
 
 ## Deploying
 
-The app is one process with one SQLite file, so it fits any host that can run a container or Node.js with a persistent disk.
+The app runs as one Node process. It keeps bookings in a SQLite file by default, which fits any host that can run a container or Node.js with a persistent disk. Set `DATABASE_URL` to a Postgres connection string and it keeps them in Postgres instead, which fits hosts without a disk, such as Vercel and the free Render plan.
 
 ```bash
 docker build -t appointment-reminders .
 docker run -p 3000:3000 --env-file .env -v reminders-data:/app/data appointment-reminders
 ```
 
-The image reports its health through `/healthz`, and it fixes the permissions of `/app/data` itself, so a named volume, a host folder or a cloud disk all work. The container starts as root only to make that folder writable, and then runs the app as the unprivileged `node` user.
+The image reports its health through `/healthz`, and it fixes the permissions of `/app/data` itself, so a named volume, a host folder or a cloud disk all work. The container starts as root only to make that folder writable, and then runs the app as the unprivileged `node` user. Leave the volume out and add `-e DATABASE_URL=postgres://...` to use Postgres instead.
 
 Without Docker, run `npm run build` and then `npm start`.
 
-Before you go live, set `ADMIN_PASSWORD` and serve the app over HTTPS. Keep the database on a persistent volume and run a single instance, because the status polling state lives in memory. Register the webhook for your real domain with `npm run setup:webhook -- https://your-domain`. Messages to US numbers need 10DLC registration with Sent before they are delivered. If you ever pasted your API key somewhere it should not be, rotate it first.
+Before you go live, set `ADMIN_PASSWORD` and serve the app over HTTPS. Keep the database on a persistent volume or in Postgres. With SQLite run a single instance. The login and booking rate limits live in memory, so with several instances each one counts on its own. Register the webhook for your real domain with `npm run setup:webhook -- https://your-domain`. Messages to US numbers need 10DLC registration with Sent before they are delivered. If you ever pasted your API key somewhere it should not be, rotate it first.
 
 ## One-click deploy
 
-The **Deploy to Render** button at the top of this page reads [`render.yaml`](render.yaml), builds the Docker image and attaches a 1 GB persistent disk at `/app/data`, which is where the SQLite file lives. The disk needs Render's Starter plan, because free plans lose their files on every restart. The button works for a public repository, so if you forked this repo privately, connect it from the Render dashboard with **New, Blueprint** instead.
+The two buttons at the top of this page need a Postgres database, because neither platform keeps files between restarts on a free plan. [Neon](https://neon.tech) has a free Postgres plan, and its connection string looks like `postgres://user:password@host/dbname`. Create the database first and keep the connection string ready. Connections use SSL unless the host is `localhost` or the string contains `sslmode=disable`.
 
-1. Click the button and sign in to Render.
-2. Enter `SENT_DM_API_KEY`, `BUSINESS_NAME` and `ADMIN_PASSWORD` when Render asks. Change `BUSINESS_TIMEZONE`, `SERVICES` and `DEFAULT_COUNTRY_CODE` if the defaults do not suit you.
-3. Wait for the first deploy to finish and open the service URL. The booking page is at `/` and the dashboard is at `/admin/`.
-4. Register the webhook for the new address from your own machine, then copy the signing secret it prints into the service's `SENT_DM_WEBHOOK_SECRET` setting on Render:
+### Deploy with Vercel
+
+1. Click **Deploy with Vercel** and sign in. Vercel clones the repository into your GitHub account.
+2. Enter `SENT_DM_API_KEY`, `BUSINESS_NAME`, `ADMIN_PASSWORD` and `DATABASE_URL` when Vercel asks. You can instead add a Postgres database from the **Storage** tab of the project, and the app reads the `POSTGRES_URL` that Vercel sets.
+3. Add `BUSINESS_TIMEZONE`, `SERVICES` and `DEFAULT_COUNTRY_CODE` under **Settings, Environment Variables** if the defaults do not suit you, then redeploy.
+4. Open the project address. The booking page is at `/` and the dashboard is at `/admin/`.
+
+Vercel runs the app as a serverless function from [`api/index.js`](api/index.js), with [`vercel.json`](vercel.json) sending the API, the dashboard and the webhook to it. The tables are created on the first request. A function can run for up to 30 seconds, which is enough for a booking and its two Sent calls.
+
+### Deploy to Render
+
+1. Click **Deploy to Render** and sign in. Render reads [`render.yaml`](render.yaml) and builds the Docker image.
+2. Enter `SENT_DM_API_KEY`, `BUSINESS_NAME`, `ADMIN_PASSWORD` and `DATABASE_URL` when Render asks.
+3. Wait for the first deploy and open the service address.
+
+The blueprint uses Render's free plan, which puts the service to sleep after a quiet period, so the first request after a pause is slow. Change `plan` in `render.yaml` to `starter` for an always-on service. If you would rather keep SQLite, add a disk under `disk` in the same file and leave `DATABASE_URL` empty. The button works for a public repository. If you forked this repository privately, connect it from the Render dashboard with **New, Blueprint**.
+
+### After either deploy
+
+Register the webhook for the new address from your own machine, then copy the signing secret it prints into the `SENT_DM_WEBHOOK_SECRET` setting on the platform:
 
 ```bash
-npm run setup:webhook -- https://your-service.onrender.com
+npm run setup:webhook -- https://your-project.vercel.app
 ```
 
-`setup:webhook` writes the secret into your local `.env`, so open that file and paste the value into Render. The service restarts when you save the setting, and replies start working once a Sent channel can receive them.
-
-Vercel is not a fit for this app. Vercel runs functions on a read-only, short-lived file system, so a SQLite file would lose every booking, and the app needs one long-running process that keeps its state. Use Render, Fly.io, Railway or any host that runs Docker with a persistent volume.
+`setup:webhook` writes the secret into your local `.env`, so open that file and paste the value into the platform's settings and redeploy. Replies start working once a Sent channel can receive them.
 
 ## FAQ
 
@@ -456,9 +480,9 @@ Bookings, confirmations, reminders and delivery status all work. Customer replie
 
 Sent validates each request and sends nothing. Its responses are sample data, so reading a sandbox message back returns 404, and the app skips status polling. If you leave sandbox mode on in production, Sent still answers 202 but never delivers anything, so check the mode badge at the top of the page.
 
-**Why only one instance?**
+**Can I run more than one instance?**
 
-Bookings live in a SQLite file and the status polling state lives in memory. Two instances would each poll, and a SQLite file cannot be shared safely over a network disk.
+Yes, with Postgres. Bookings, the one-booking-per-slot rule and the webhook event ids all live in the database. The login and booking rate limits are kept in memory, so each instance counts on its own. With SQLite, run a single instance, because a SQLite file cannot be shared safely over a network disk.
 
 **Can a customer have several appointments?**
 

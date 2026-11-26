@@ -48,7 +48,7 @@ export interface Reminders {
   reschedule(id: string, request: RescheduleRequest): Promise<BookingResult | undefined>;
   cancel(id: string): Promise<BookingResult | undefined>;
   handleInbound(payload: InboundPayload): Promise<void>;
-  handleStatus(event: string, payload: { message_id?: string; channel?: string }): void;
+  handleStatus(event: string, payload: { message_id?: string; channel?: string }): Promise<void>;
   syncStatuses(): Promise<void>;
 }
 
@@ -140,19 +140,19 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
       assertSchedulable(start, lead);
       const startsAt = start.toISOString();
 
-      const repeat = store.findActive(phone, startsAt);
-      if (repeat) return store.get(repeat.id)!;
+      const repeat = await store.findActive(phone, startsAt);
+      if (repeat) return repeat;
 
-      if (store.takenStarts().has(startsAt)) {
+      if ((await store.takenStarts()).has(startsAt)) {
         throw new ValidationError('That time was just taken. Please pick another slot.', 'slot_unavailable');
       }
-      if (store.countUpcomingByPhone(phone, new Date()) >= MAX_UPCOMING_PER_PHONE) {
+      if (await store.countUpcomingByPhone(phone, new Date()) >= MAX_UPCOMING_PER_PHONE) {
         throw new ValidationError(`This number already has ${MAX_UPCOMING_PER_PHONE} upcoming appointments. Cancel one before booking another.`);
       }
 
       let appointment: Appointment;
       try {
-        appointment = store.create({ name, service, phone, startsAt, reminderLeadMinutes: lead });
+        appointment = await store.create({ name, service, phone, startsAt, reminderLeadMinutes: lead });
       } catch (err) {
         throw err instanceof SlotTakenError ? new ValidationError('That time was just taken. Please pick another slot.', 'slot_unavailable') : err;
       }
@@ -161,35 +161,35 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
       try {
         reminderId = await scheduleReminder(appointment, lead, `reminder-${appointment.id}`);
       } catch (err) {
-        store.delete(appointment.id);
+        await store.delete(appointment.id);
         throw err;
       }
       try {
-        store.setReminder(appointment.id, reminderId);
+        await store.setReminder(appointment.id, reminderId);
       } catch (err) {
         await messenger.cancel(reminderId).catch(() => undefined);
-        store.delete(appointment.id);
+        await store.delete(appointment.id);
         throw err;
       }
 
       let confirmationError: string | undefined;
       try {
         const messageId = await sendNotice(appointment, config.confirmationTemplateName, `confirmation-${appointment.id}`, { service_name: service });
-        if (messageId) store.setConfirmation(appointment.id, messageId);
+        if (messageId) await store.setConfirmation(appointment.id, messageId);
       } catch (err) {
         confirmationError = err instanceof NoticeError ? err.message : 'The booking text could not be sent.';
       }
-      return { ...store.get(appointment.id)!, ...(confirmationError && { confirmationError }) };
+      return { ...(await store.get(appointment.id))!, ...(confirmationError && { confirmationError }) };
     },
 
     async reschedule(id, { startsAt: requested, reminderMinutes }) {
-      const current = store.get(id);
+      const current = await store.get(id);
       if (!current || current.status === 'cancelled') return undefined;
 
       const start = new Date(requested);
       const lead = chooseLead(start, reminderMinutes ?? current.reminderLeadMinutes ?? undefined);
       assertSchedulable(start, lead);
-      if (store.takenStarts(id).has(start.toISOString())) {
+      if ((await store.takenStarts(id)).has(start.toISOString())) {
         throw new ValidationError('That time is taken. Pick another slot.', 'slot_unavailable');
       }
       if (start.toISOString() === current.startsAt && lead === current.reminderLeadMinutes && current.status !== 'reschedule_requested') {
@@ -206,40 +206,40 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
       }
 
       try {
-        store.reschedule(id, moved.startsAt, lead);
+        await store.reschedule(id, moved.startsAt, lead);
       } catch (err) {
         await messenger.cancel(newReminderId).catch(() => undefined);
         throw err instanceof SlotTakenError ? new ValidationError('That time is taken. Pick another slot.', 'slot_unavailable') : err;
       }
-      store.setReminder(id, newReminderId);
+      await store.setReminder(id, newReminderId);
 
       let confirmationError: string | undefined;
       try {
         const messageId = await sendNotice(moved, config.rescheduleTemplateName, `reschedule-${id}-${start.getTime()}`);
-        if (messageId) store.setConfirmation(id, messageId);
+        if (messageId) await store.setConfirmation(id, messageId);
       } catch (err) {
         confirmationError = err instanceof NoticeError ? err.message : 'The reschedule text could not be sent.';
       }
-      return { ...store.get(id)!, ...(confirmationError && { confirmationError }) };
+      return { ...(await store.get(id))!, ...(confirmationError && { confirmationError }) };
     },
 
     async cancel(id) {
-      const appointment = store.get(id);
+      const appointment = await store.get(id);
       if (!appointment) return undefined;
       if (appointment.status === 'cancelled') return appointment;
       if (appointment.reminderMessageId) {
         await messenger.cancel(appointment.reminderMessageId);
       }
-      store.setStatus(id, 'cancelled');
+      await store.setStatus(id, 'cancelled');
 
       let confirmationError: string | undefined;
       try {
         const messageId = await sendNotice(appointment, config.cancellationTemplateName, `cancel-${id}`, {}, ['customer_name', 'appointment_date']);
-        if (messageId) store.setConfirmation(id, messageId);
+        if (messageId) await store.setConfirmation(id, messageId);
       } catch (err) {
         confirmationError = err instanceof NoticeError ? err.message : 'The cancellation text could not be sent.';
       }
-      return { ...store.get(id)!, ...(confirmationError && { confirmationError }) };
+      return { ...(await store.get(id))!, ...(confirmationError && { confirmationError }) };
     },
 
     async handleInbound(payload) {
@@ -251,26 +251,26 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
       const channel = payload.channel?.toLowerCase();
       const replyChannel = channel && DELIVERY_CHANNELS.has(channel) ? channel : undefined;
 
-      const appointment = store.findUpcomingByPhone(phone, new Date());
+      const appointment = await store.findUpcomingByPhone(phone, new Date());
       if (!appointment) return;
-      store.setLastReply(appointment.id, text, new Date());
+      await store.setLastReply(appointment.id, text, new Date());
 
       const { date, time } = formatInZone(appointment.startsAt);
       if (intent === 'confirm') {
-        store.setStatus(appointment.id, 'confirmed');
+        await store.setStatus(appointment.id, 'confirmed');
         await reply(phone, replyChannel, `Thanks ${appointment.name}, your appointment on ${date} at ${time} is confirmed.`);
       } else if (intent === 'reschedule') {
-        store.setStatus(appointment.id, 'reschedule_requested');
+        await store.setStatus(appointment.id, 'reschedule_requested');
         await reply(phone, replyChannel, `No problem ${appointment.name}. We will contact you shortly to find a new time.`);
       } else {
         await reply(phone, replyChannel, `Your appointment is on ${date} at ${time}. Reply C to confirm or R to reschedule.`);
       }
     },
 
-    handleStatus(event, payload) {
+    async handleStatus(event, payload) {
       if (payload.message_id) {
         const channel = payload.channel?.toLowerCase();
-        store.setMessageStatus(payload.message_id, event.replace(/^message\./, ''), channel && DELIVERY_CHANNELS.has(channel) ? channel : undefined);
+        await store.setMessageStatus(payload.message_id, event.replace(/^message\./, ''), channel && DELIVERY_CHANNELS.has(channel) ? channel : undefined);
       }
     },
 
@@ -278,8 +278,7 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
       if (config.sandbox) return;
       const now = Date.now();
 
-      const tracked = store
-        .list()
+      const tracked = (await store.list())
         .filter((a) => a.status !== 'cancelled')
         .flatMap((a) => [
           { id: a.reminderMessageId, status: a.reminderStatus, channel: a.reminderChannel },
@@ -294,7 +293,7 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
           .map(async ({ id }) => {
             lastPolled.set(id, now);
             const { status, channel } = await messenger.status(id);
-            if (status) store.setMessageStatus(id, status, channel);
+            if (status) await store.setMessageStatus(id, status, channel);
           }),
       );
     },

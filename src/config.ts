@@ -17,6 +17,7 @@ export interface Config {
   timezone: string;
   sandbox: boolean;
   databasePath: string;
+  databaseUrl: string;
   trustProxy: boolean | number | string;
   bookingsPerHourPerIp: number;
 }
@@ -105,6 +106,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     problems.push(`BOOKINGS_PER_HOUR_PER_IP must be a whole number of at least 1, got "${env.BOOKINGS_PER_HOUR_PER_IP}"`);
   }
 
+  const databaseUrl = (env.DATABASE_URL ?? env.POSTGRES_URL)?.trim() ?? '';
+  if (databaseUrl && !/^postgres(ql)?:\/\//.test(databaseUrl)) {
+    problems.push('DATABASE_URL must be a Postgres connection string that starts with postgres:// or postgresql://');
+  }
+
   const proxy = env.TRUST_PROXY?.trim() ?? '';
   const trustProxy: boolean | number | string = proxy === '' || proxy === 'false' ? false : proxy === 'true' ? true : /^\d+$/.test(proxy) ? Number(proxy) : proxy;
 
@@ -129,6 +135,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     timezone,
     sandbox: env.SENT_SANDBOX === 'true',
     databasePath: env.DATABASE_PATH ?? './data/appointments.db',
+    databaseUrl,
     trustProxy,
     bookingsPerHourPerIp,
   };
