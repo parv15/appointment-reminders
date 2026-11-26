@@ -14,6 +14,12 @@ This project is a booking portal and an admin dashboard for businesses that take
   <img alt="License MIT" src="https://img.shields.io/badge/license-MIT-green.svg">
 </p>
 
+<p>
+  <a href="https://render.com/deploy?repo=https://github.com/parv15/sent-appointment-reminders"><img alt="Deploy to Render" src="https://render.com/images/deploy-to-render-button.svg"></a>
+</p>
+
+The button creates a Render web service from [`render.yaml`](render.yaml) with a persistent disk for the booking database. Render asks you for your Sent API key, your business name and an admin password, and the steps after that are listed under [One-click deploy](#one-click-deploy).
+
 ## The problem
 
 A missed appointment costs a business the time slot and the income. A reminder text helps, but a reminder that only travels one way leaves the staff guessing who is coming. Most examples also stop at sending an SMS. They poll the database every minute to decide what to send, they never find out whether the message arrived, and they have no answer for a customer who writes back.
@@ -31,7 +37,7 @@ A missed appointment costs a business the time slot and the income. A reminder t
 | Waiting for template approval | The app uses Sent's approved templates until yours are approved, then switches to yours by itself. |
 | Fake or replayed webhooks | Signatures are checked in constant time, requests older than five minutes are refused and each event is processed once. |
 
-**Contents:** [Demo](#demo) · [How it works](#how-it-works) · [Features](#features) · [Stack](#stack) · [Prerequisites](#prerequisites) · [Quick start](#quick-start) · [Screenshots](#screenshots) · [When the reminder is sent](#when-the-reminder-is-sent) · [Replies and status](#replies-and-status) · [Key integration points](#key-integration-points) · [Failure behavior](#failure-behavior) · [Security design](#security-design) · [Configuration](#configuration) · [API](#api) · [Project layout](#project-layout) · [Deploying](#deploying) · [FAQ](#faq) · [Contributing](#contributing)
+**Contents:** [Demo](#demo) · [How it works](#how-it-works) · [Features](#features) · [Stack](#stack) · [Prerequisites](#prerequisites) · [Quick start](#quick-start) · [Screenshots](#screenshots) · [When the reminder is sent](#when-the-reminder-is-sent) · [Replies and status](#replies-and-status) · [Key integration points](#key-integration-points) · [Failure behavior](#failure-behavior) · [Security design](#security-design) · [Configuration](#configuration) · [API](#api) · [Project layout](#project-layout) · [Deploying](#deploying) · [One-click deploy](#one-click-deploy) · [FAQ](#faq) · [Contributing](#contributing)
 
 ## Demo
 
@@ -405,11 +411,28 @@ docker build -t appointment-reminders .
 docker run -p 3000:3000 --env-file .env -v reminders-data:/app/data appointment-reminders
 ```
 
-The image runs as the unprivileged `node` user and reports its health through `/healthz`. A named volume works as shown. If you mount a folder from the host instead, make it writable for user ID 1000.
+The image reports its health through `/healthz`, and it fixes the permissions of `/app/data` itself, so a named volume, a host folder or a cloud disk all work. The container starts as root only to make that folder writable, and then runs the app as the unprivileged `node` user.
 
 Without Docker, run `npm run build` and then `npm start`.
 
 Before you go live, set `ADMIN_PASSWORD` and serve the app over HTTPS. Keep the database on a persistent volume and run a single instance, because the status polling state lives in memory. Register the webhook for your real domain with `npm run setup:webhook -- https://your-domain`. Messages to US numbers need 10DLC registration with Sent before they are delivered. If you ever pasted your API key somewhere it should not be, rotate it first.
+
+## One-click deploy
+
+The **Deploy to Render** button at the top of this page reads [`render.yaml`](render.yaml), builds the Docker image and attaches a 1 GB persistent disk at `/app/data`, which is where the SQLite file lives. The disk needs Render's Starter plan, because free plans lose their files on every restart. The button works for a public repository, so if you forked this repo privately, connect it from the Render dashboard with **New, Blueprint** instead.
+
+1. Click the button and sign in to Render.
+2. Enter `SENT_DM_API_KEY`, `BUSINESS_NAME` and `ADMIN_PASSWORD` when Render asks. Change `BUSINESS_TIMEZONE`, `SERVICES` and `DEFAULT_COUNTRY_CODE` if the defaults do not suit you.
+3. Wait for the first deploy to finish and open the service URL. The booking page is at `/` and the dashboard is at `/admin/`.
+4. Register the webhook for the new address from your own machine, then copy the signing secret it prints into the service's `SENT_DM_WEBHOOK_SECRET` setting on Render:
+
+```bash
+npm run setup:webhook -- https://your-service.onrender.com
+```
+
+`setup:webhook` writes the secret into your local `.env`, so open that file and paste the value into Render. The service restarts when you save the setting, and replies start working once a Sent channel can receive them.
+
+Vercel is not a fit for this app. Vercel runs functions on a read-only, short-lived file system, so a SQLite file would lose every booking, and the app needs one long-running process that keeps its state. Use Render, Fly.io, Railway or any host that runs Docker with a persistent volume.
 
 ## FAQ
 

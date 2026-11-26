@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: sent-appointment-reminders
+    runtime: docker
+    plan: starter
+    healthCheckPath: /healthz
+    disk:
+      name: data
+      mountPath: /app/data
+      sizeGB: 1
+    envVars:
+      - key: SENT_DM_API_KEY
+        sync: false
+      - key: BUSINESS_NAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: BUSINESS_TIMEZONE
+        value: UTC
+      - key: SERVICES
+        value: Appointment
+      - key: DEFAULT_COUNTRY_CODE
+        value: "+1"
+      - key: SENT_DM_WEBHOOK_SECRET
+        sync: false
+      - key: TRUST_PROXY
+        value: "1"
