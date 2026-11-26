@@ -2,7 +2,7 @@
 
 # Appointment reminders with reply handling
 
-**Online booking, an instant confirmation text, a scheduled reminder, and one-letter replies, built on [Sent](https://sent.dm).**
+A booking portal that texts customers a confirmation and a reminder, and lets them reply C or R. Built on [Sent](https://sent.dm).
 
 [![CI](https://github.com/parv15/sent-appointment-reminders/actions/workflows/ci.yml/badge.svg)](https://github.com/parv15/sent-appointment-reminders/actions/workflows/ci.yml)
 [![Node](https://img.shields.io/badge/node-%E2%89%A522.13-339933?logo=node.js&logoColor=white)](https://nodejs.org)
@@ -16,17 +16,11 @@
 
 ## What it does
 
-No-shows cost appointment businesses real money. This app is a small, complete example of the fix:
+A customer books a slot on a web page and gets a confirmation text straight away. Sent holds a reminder and sends it a set time before the appointment, on whichever channel suits the customer: SMS, WhatsApp or RCS. The customer can answer the reminder with `C` to confirm or `R` to ask for a new time, and the booking updates itself.
 
-1. A customer books a slot on a **booking portal**.
-2. They instantly get a **confirmation text**.
-3. Sent holds a **reminder** and sends it a set time before the appointment, on the channel that suits the customer (SMS, WhatsApp or RCS).
-4. The customer replies **`C`** to confirm or **`R`** to ask for a new time. The status updates and they get an answer.
-5. The business watches everything on an **admin dashboard**: bookings, delivery status of every text, replies, and cancellations.
+The business sees all of this on an admin page: every booking, whether each text was delivered, what customers replied, and what was cancelled.
 
-There is no queue and no cron job. Sent's `scheduled_at` does the waiting, and a webhook brings the replies back.
-
-It is a reference implementation for developers building on Sent: a typed SDK client, scheduled sends, per-message status tracking, signed webhooks, idempotent retries and friendly error handling, in about 1,100 lines of TypeScript.
+The app has no queue and no cron job. Sent's `scheduled_at` field does the waiting, and a webhook brings replies back. It is meant as a reference for developers building on Sent, so it covers the parts a real integration needs: scheduled sends, delivery tracking, signed webhooks, safe retries and readable error messages. It is about 1,100 lines of TypeScript.
 
 ## Screenshots
 
@@ -37,15 +31,15 @@ It is a reference implementation for developers building on Sent: a typed SDK cl
     <td width="33%"><img src="docs/screenshots/portal-booked.png" alt="Booking confirmed, with the text message and delivery progress"></td>
   </tr>
   <tr>
-    <td align="center"><b>1. Pick a time</b></td>
-    <td align="center"><b>2. Your details</b></td>
-    <td align="center"><b>3. Booked, text delivered</b></td>
+    <td align="center">Pick a time</td>
+    <td align="center">Enter details</td>
+    <td align="center">Booked, text delivered</td>
   </tr>
 </table>
 
-## Quick start (no Sent account needed)
+## Quick start
 
-Demo mode simulates Sent locally and adds a fake customer phone to the admin page, so you can try the whole flow in a minute.
+You can try everything without a Sent account. Demo mode replaces Sent with a local simulator and adds a fake customer phone to the admin page.
 
 ```bash
 git clone https://github.com/parv15/sent-appointment-reminders.git
@@ -54,25 +48,17 @@ npm install
 npm run demo
 ```
 
-| Page | URL |
-| --- | --- |
-| Customer booking portal | <http://localhost:3000> |
-| Admin dashboard | <http://localhost:3000/admin/> |
+The customer portal is at <http://localhost:3000> and the admin page is at <http://localhost:3000/admin/>.
 
-Try this:
+To see the whole flow, book a slot on the portal, then open the admin page. The booking, its confirmation text and its scheduled reminder are all listed there. In the phone panel, click **Deliver now** on the reminder, which stands in for Sent releasing it at the reminder time. Then reply `C` and watch the booking become confirmed. Replying `R`, `hello` or `STOP` on other bookings shows the other paths.
 
-1. On the portal, pick a service, day and time, enter a name and number, and confirm. You see the booking and the text the customer receives.
-2. Open the admin page. The booking, the confirmation alert and the scheduled reminder are listed.
-3. In the phone panel, click **Deliver now** on the reminder. This stands in for Sent releasing it at the reminder time.
-4. Reply **C**. The booking turns `confirmed` and a confirmation text arrives. Try **R**, `hello` and `STOP` on other bookings.
-
-Make the demo look like your business:
+To make the demo use your own business details:
 
 ```bash
 BUSINESS_NAME="Acme Dental" SERVICES="Dental checkup,Teeth cleaning" npm run demo
 ```
 
-Demo data lives in memory and disappears on restart.
+Demo data is kept in memory and is lost when the server stops.
 
 ## How it works
 
@@ -93,17 +79,17 @@ sequenceDiagram
     S-->>C: Your appointment is confirmed
 ```
 
-### When is the reminder sent?
+### When the reminder is sent
 
-`REMINDER_LEAD_MINUTES` sets how long before the appointment the reminder goes out. The default is `1440`, which is 24 hours.
+`REMINDER_LEAD_MINUTES` sets how long before the appointment the reminder goes out. The default is 1440, which is 24 hours. The customer sees the exact reminder time on the booking page, and the admin page lists it in the activity feed.
 
-| Appointment is | With `REMINDER_LEAD_MINUTES=1440` | What the app does |
+| The appointment is | With the default of 24 hours | What happens |
 | --- | --- | --- |
-| 3 days away | Reminder due in 2 days | Asks Sent to send it then, using `scheduled_at` |
-| 20 hours away | Reminder time already passed | Sends it right away |
-| Reminder time under 2 minutes away | Too close for Sent to schedule | Sends it right away |
+| 3 days away | The reminder is due in 2 days | The app asks Sent to send it then, using `scheduled_at` |
+| 20 hours away | The reminder time has already passed | The reminder is sent right away |
+| 24 hours and 1 minute away | The reminder is due in 1 minute | Sent cannot schedule that close, so it is sent right away |
 
-Sent accepts `scheduled_at` between one minute and 30 days ahead. The portal only offers the next 14 days, so a booking always fits. The customer sees the exact reminder time on the booking page, and the admin page shows it in the feed.
+Sent accepts `scheduled_at` from one minute to 30 days ahead. The portal only offers the next 14 days, so every booking fits inside that range.
 
 ### Appointment status
 
@@ -121,21 +107,18 @@ stateDiagram-v2
 
 ### Replies
 
-| Customer sends | Result |
+| The customer sends | What happens |
 | --- | --- |
-| `C`, `confirm`, `confirmed` | Status `confirmed`, confirmation text sent back |
-| `R`, `reschedule` | Status `reschedule_requested`, acknowledgement sent back |
-| `STOP`, `HELP` and the other compliance keywords | Handled by Sent. The app does nothing |
-| Anything else | A text reminding them to reply `C` or `R` |
+| `C`, `confirm` or `confirmed` | The booking becomes `confirmed` and a confirmation text is sent back |
+| `R` or `reschedule` | The booking becomes `reschedule_requested` and an acknowledgement is sent back |
+| `STOP`, `HELP` or another compliance keyword | Sent handles it and the app does nothing |
+| Anything else | A text asks them to reply `C` or `R` |
 
-Matching ignores case and surrounding spaces. A reply applies to the customer's next upcoming appointment, found by phone number. Delivery of the answer needs an open conversation window, which a customer reply opens: on SMS and RCS once they reply, on WhatsApp for 24 hours after their last message.
+Matching ignores capital letters and surrounding spaces. A reply applies to the customer's next upcoming appointment, which the app finds by phone number. The answer can only be sent once a conversation window is open, and the customer's reply opens it. On SMS and RCS that happens as soon as they reply. On WhatsApp the window lasts 24 hours after their last message.
 
 ### Delivery status
 
-Every text has a status: `queued`, `scheduled`, `sent`, `delivered`, `failed` or `blocked`. The app learns it two ways, so it works before you set up a webhook:
-
-- Sent webhooks, when `SENT_DM_WEBHOOK_SECRET` is set.
-- Polling Sent for any message that has not reached a final state.
+Each text is `queued`, `scheduled`, `sent`, `delivered`, `failed` or `blocked`. The app learns the status in two ways, so it works before you have set up a webhook. If `SENT_DM_WEBHOOK_SECRET` is set, Sent pushes status changes to the webhook. The app also asks Sent about any message that has not reached a final state.
 
 ## Run it with your Sent account
 
@@ -143,7 +126,7 @@ You need Node.js 22.13 or later and a [Sent](https://app.sent.dm) account. Light
 
 ### 1. Create the templates
 
-Sent sends the confirmation and the reminder from approved templates. Create two with the files in [`docs/templates`](docs/templates):
+Sent sends the confirmation and the reminder from approved templates. The two definitions in [`docs/templates`](docs/templates) can be submitted with `curl`:
 
 ```bash
 export SENT_DM_API_KEY=your_api_key
@@ -157,7 +140,7 @@ curl -X POST https://api.sent.dm/v3/templates \
   -d @docs/templates/appointment_confirmation_reply.json
 ```
 
-Both are submitted for review. WhatsApp templates go through Meta review and RCS templates through the RCS sender profile, so approval can take time. Until they are approved, the app falls back to the templates every Sent account already has, `sent_Appointment_Reminder_2` and `sent_Appointment_Confirmation_1`. Those texts have no reply instructions, so the booking page also shows customers how to reply. The app checks every five minutes and switches to yours once they are `APPROVED`.
+Both go to review. WhatsApp templates are reviewed by Meta and RCS templates through the RCS sender profile, so approval can take a while. In the meantime the app uses the templates that every Sent account already has, `sent_Appointment_Reminder_2` and `sent_Appointment_Confirmation_1`. Their text does not tell customers how to reply, which is why the booking page explains it. The app checks template status every five minutes and switches to yours once they are `APPROVED`.
 
 ### 2. Configure
 
@@ -165,11 +148,11 @@ Both are submitted for review. WhatsApp templates go through Meta review and RCS
 cp .env.example .env
 ```
 
-Set at least `SENT_DM_API_KEY` and `BUSINESS_NAME`. Start with `SENT_SANDBOX=true`: Sent validates every request without sending anything, so a wrong phone format, a missing template or a bad key shows up safely.
+Set `SENT_DM_API_KEY` and `BUSINESS_NAME` at least. It is a good idea to start with `SENT_SANDBOX=true`. In sandbox mode Sent checks every request but sends nothing, so a wrong phone format, a missing template or a bad key shows up without any cost.
 
-### 3. Register the webhook (for replies)
+### 3. Register the webhook
 
-Replies come back through a webhook, so Sent must reach your server over HTTPS. While developing, use a tunnel such as [ngrok](https://ngrok.com):
+Replies reach the app through a webhook, so Sent needs a public HTTPS address for your server. During development a tunnel such as [ngrok](https://ngrok.com) provides one:
 
 ```bash
 ngrok http 3000
@@ -183,7 +166,7 @@ curl -X POST https://api.sent.dm/v3/webhooks \
   }'
 ```
 
-Put the returned `signing_secret` in `SENT_DM_WEBHOOK_SECRET`. Without it the app still sends and tracks texts, and warns at startup that replies are ignored.
+Copy the `signing_secret` from the response into `SENT_DM_WEBHOOK_SECRET`. If you skip this step the app still sends texts and tracks their delivery, but it warns at startup that customer replies are ignored.
 
 ### 4. Run
 
@@ -192,7 +175,7 @@ npm install
 npm run dev
 ```
 
-For production, build once and start:
+For production, build once and then start:
 
 ```bash
 npm run build
@@ -201,48 +184,48 @@ npm start
 
 ## Configuration
 
-Set these in `.env`. See [`.env.example`](.env.example) for a starting point.
+All settings are environment variables, usually kept in `.env`. [`.env.example`](.env.example) is a good starting point.
 
 | Variable | Default | Description |
 | --- | --- | --- |
 | `SENT_DM_API_KEY` | required | API key from the Sent dashboard |
 | `BUSINESS_NAME` | required | Business name used in the texts, for example `Acme Dental` |
 | `SENT_DM_WEBHOOK_SECRET` | empty | Webhook signing secret. Without it, customer replies are ignored |
-| `SENT_TEMPLATE_NAME` | `appointment_reminder_reply,sent_Appointment_Reminder_2` | Reminder template. A comma-separated list: the first `APPROVED` one is used |
-| `SENT_CONFIRMATION_TEMPLATE` | `appointment_confirmation_reply,sent_Appointment_Confirmation_1` | Booking confirmation template, same list rule. Set empty to turn the confirmation off |
-| `REMINDER_LEAD_MINUTES` | `1440` | How long before the appointment the reminder goes out |
-| `SERVICES` | `Appointment` | Comma-separated services customers can book |
-| `BUSINESS_TIMEZONE` | `UTC` | IANA timezone for business hours and for dates in texts, for example `America/New_York` |
+| `SENT_TEMPLATE_NAME` | `appointment_reminder_reply,sent_Appointment_Reminder_2` | Reminder template. This is a comma-separated list and the first `APPROVED` template is used |
+| `SENT_CONFIRMATION_TEMPLATE` | `appointment_confirmation_reply,sent_Appointment_Confirmation_1` | Booking confirmation template, with the same list rule. Set it to empty to turn the confirmation off |
+| `REMINDER_LEAD_MINUTES` | `1440` | How long before the appointment the reminder is sent |
+| `SERVICES` | `Appointment` | Comma-separated list of services customers can book |
+| `BUSINESS_TIMEZONE` | `UTC` | IANA timezone for business hours and for the dates in texts, for example `America/New_York` |
 | `BOOKING_START_HOUR` | `9` | First bookable hour |
 | `BOOKING_END_HOUR` | `17` | End of the last slot |
 | `SLOT_MINUTES` | `30` | Slot length: 10, 15, 20, 30, 45 or 60 |
 | `DEFAULT_COUNTRY_CODE` | `+1` | Country code preselected on the portal |
-| `ADMIN_PASSWORD` | empty | Protects `/admin` with HTTP basic auth, user `admin`. Set it before exposing the server |
+| `ADMIN_PASSWORD` | empty | Password for `/admin`, using HTTP basic auth with the user name `admin` |
 | `SENT_SANDBOX` | `false` | Validate requests without sending anything |
-| `DEMO_MODE` | `false` | Simulate Sent locally. Set by `npm run demo` |
+| `DEMO_MODE` | `false` | Simulate Sent locally. `npm run demo` sets it for you |
 | `PORT` | `3000` | HTTP port |
 | `DATABASE_PATH` | `./data/appointments.db` | SQLite file |
 
 ## API
 
-Public, used by the booking portal:
+These endpoints are used by the booking portal and are open to anyone:
 
 | Method | Path | Description |
 | --- | --- | --- |
 | `GET` | `/api/config` | Business name, services, timezone and mode |
 | `GET` | `/api/slots?date=YYYY-MM-DD` | Open slots for a day, as UTC instants |
-| `POST` | `/api/bookings` | Book a slot. Body: `service`, `name`, `phone` (E.164), `startsAt` (a slot from `/api/slots`) |
+| `POST` | `/api/bookings` | Book a slot. The body has `service`, `name`, `phone` in E.164 format, and `startsAt`, which must be one of the slots from `/api/slots` |
 | `GET` | `/api/bookings/:id` | One booking and the delivery status of its confirmation text |
-| `POST` | `/webhooks/sent` | Sent webhook receiver |
-| `GET` | `/healthz` | Liveness |
+| `POST` | `/webhooks/sent` | Receives Sent webhooks |
+| `GET` | `/healthz` | Liveness check |
 
-Admin, behind `ADMIN_PASSWORD` when it is set:
+These are for the admin page and require `ADMIN_PASSWORD` when it is set:
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `GET` | `/admin/` | Dashboard |
+| `GET` | `/admin/` | The dashboard |
 | `GET` | `/api/admin/appointments` | All bookings |
-| `GET` | `/api/admin/activity` | Alerts and activity feed |
+| `GET` | `/api/admin/activity` | The alerts and activity feed |
 | `POST` | `/api/admin/appointments/:id/cancel` | Cancel a booking and its scheduled reminder |
 
 ```bash
@@ -257,16 +240,16 @@ curl -X POST http://localhost:3000/api/bookings \
 
 ```
 src/
-  server.ts       Entry point: config, startup checks, shutdown
+  server.ts       Entry point: config, startup checks and shutdown
   app.ts          Portal, admin and webhook routes
-  reminders.ts    Booking, cancelling, reply and status logic
+  reminders.ts    Booking, cancelling, replies and status updates
   messenger.ts    Thin wrapper over the Sent SDK, with template fallback
   demo.ts         Local Sent simulator for demo mode
   slots.ts        Business hours and open slots, timezone aware
   signature.ts    Webhook signature verification
   replies.ts      Reply classification
   activity.ts     Alerts and activity feed
-  errors.ts       Sent API errors turned into readable messages
+  errors.ts       Turns Sent API errors into readable messages
   config.ts       Environment validation
   auth.ts         Admin basic auth
   store.ts        SQLite storage
@@ -275,26 +258,38 @@ admin/            Admin dashboard
 docs/             Template definitions and screenshots
 ```
 
-## Good to know
+## Notes
 
-- **Webhooks are verified.** Signatures are checked with HMAC-SHA256 over `id.timestamp.body` in constant time, requests older than five minutes are rejected, and each event id is processed once.
-- **Retries are safe.** The reminder and the confirmation each use an idempotency key derived from the booking.
-- **Cancelling** a booking cancels the reminder Sent is holding, and frees the slot.
-- **Sandbox.** Sandbox responses are sample data, so reading a sandbox message back returns 404, and the app skips status polling in sandbox mode. A sandbox flag left on in production drops messages while Sent still answers 202.
-- **US numbers** need 10DLC registration before SMS is delivered.
-- **Single instance.** Bookings live in a local SQLite file and status polling state in memory. Run one instance, with the database on a persistent disk.
-- **Before going public:** set `ADMIN_PASSWORD`, serve over HTTPS, and rotate any API key you have pasted anywhere.
+### Webhook security
+
+The app verifies each webhook with an HMAC-SHA256 signature over the event id, the timestamp and the body, compared in constant time. It rejects requests that are more than five minutes old and processes each event id only once, so a replayed or duplicated delivery does nothing.
+
+### Retries
+
+The reminder and the confirmation each carry an idempotency key built from the booking id. If a request is retried after a timeout, Sent returns the original result and the customer is not texted twice.
+
+### Cancelling
+
+Cancelling a booking cancels the reminder that Sent is holding and frees the slot for someone else. The confirmation text has already been delivered by then, so it is not recalled.
+
+### Sandbox mode
+
+Sent returns sample data for sandbox requests, so reading a sandbox message back gives a 404. The app skips status polling while `SENT_SANDBOX` is true. If you leave sandbox mode on in production, Sent still answers 202 but never delivers anything, so check the mode badge at the top of the page.
+
+### Running in production
+
+Set `ADMIN_PASSWORD` and serve the app over HTTPS. Bookings are stored in a local SQLite file and polling state is kept in memory, so run a single instance and keep the database on a persistent disk. Messages to US numbers need 10DLC registration with Sent before they are delivered. If you have pasted your API key anywhere it should not be, rotate it first.
 
 ## Troubleshooting
 
 | You see | Cause and fix |
 | --- | --- |
-| `Cannot start, fix the configuration` | A variable is missing or invalid. Each problem is listed. Compare `.env` with `.env.example` |
-| `Sent rejected the API key` | `SENT_DM_API_KEY` is wrong or revoked. Create a new key in the dashboard |
-| `No approved template for reminders` | Neither template in the list is `APPROVED`. Finish step 1 or point `SENT_TEMPLATE_NAME` at an approved template |
-| `Sent rejected the request: Invalid phone number format` | The number must be E.164, for example `+14155551234`. The portal builds it from the country code |
-| Texts go out but replies do nothing | `SENT_DM_WEBHOOK_SECRET` is unset, or Sent cannot reach your webhook URL. Redo step 3 |
-| Webhook returns 401 | Wrong signing secret, or the server clock is more than five minutes off |
+| `Cannot start, fix the configuration` | A variable is missing or invalid, and each problem is listed. Compare `.env` with `.env.example` |
+| `Sent rejected the API key` | `SENT_DM_API_KEY` is wrong or has been revoked. Create a new key in the dashboard |
+| `No approved template for reminders` | None of the templates in the list is `APPROVED`. Finish step 1, or point `SENT_TEMPLATE_NAME` at an approved template |
+| `Sent rejected the request: Invalid phone number format` | The number must be in E.164 format, for example `+14155551234`. The portal builds it from the country code and the number |
+| Texts are sent but replies do nothing | `SENT_DM_WEBHOOK_SECRET` is not set, or Sent cannot reach your webhook URL. Repeat step 3 |
+| The webhook returns 401 | The signing secret is wrong, or the server clock is more than five minutes off |
 | `Port 3000 is already in use` | Set `PORT` to another value |
 
 ## License
