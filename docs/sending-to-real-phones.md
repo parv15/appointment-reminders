@@ -84,6 +84,35 @@ The `STOP`, `START` and `HELP` keywords are answered by Sent. You can only send 
 
 Sent's compliance team tells you what to correct and how to resubmit. The most common cause is the opt-in form, so check that every element listed above is visible on your booking page.
 
+## India: why customers there cannot reply, and how to fix it
+
+What was observed on a real account:
+
+- A sender name worked for sending. A text to an Indian phone was delivered by SMS from the sender name.
+- A sender name cannot receive replies. A customer who answers `C` has nowhere to send it.
+- A real Indian local number was requested through `POST /v3/channels/sms` with `country: 'IN'` and `number_type: 'LOCAL'`. It stayed in `PROVISIONING` with reason `CHANNEL_011` ("Sent is setting this market up") for more than a day. Sent's requirements tool publishes no steps for India, so nothing could be submitted from the account side.
+- A number from another country cannot stand in. A US number sending to an Indian phone fails with `DELIVERY_003`.
+
+India also regulates business SMS. The telecom regulator (TRAI) requires senders to register with the operators' DLT system, usually the business, the sender header and each message template, and sender-name delivery depends on that. Sent does not publish India requirements in its API, so confirm with Sent whether it handles this registration for you.
+
+### How to get it fixed
+
+| Option | Replies work | What to do |
+| --- | --- | --- |
+| Ask Sent about the Indian number | Yes, once the number is `ACTIVE` | Email support@sent.dm with the message below and ask what is blocking `CHANNEL_011` and whether India needs DLT details from you. |
+| WhatsApp | Yes, for customers in any country | Open **Channels**, then the WhatsApp tab, and connect a WhatsApp Business account through Meta. The app then answers on the same channel the customer used. |
+| Keep the sender name | No, outgoing only | Customers get the confirmation and reminder but cannot answer. The booking page and the dashboard say so for Indian numbers. |
+
+Message to send to support:
+
+> Subject: India LOCAL number stuck in PROVISIONING (CHANNEL_011)
+>
+> Customer ID: your customer ID from the Sent dashboard
+>
+> I requested an India LOCAL SMS number through POST /v3/channels/sms more than a day ago. The market still shows PROVISIONING with CHANNEL_011 and no number assigned. Please tell me what is blocking it, and whether I need to give you DLT registration details (entity, sender header, message templates) for India. I want customers in India to be able to reply to my appointment texts. If a local number is not possible, please tell me the supported way to receive replies from Indian phones, for example WhatsApp.
+
+When the Indian number turns `ACTIVE`, nothing in the app changes. The next text to an Indian phone goes out from that number, and replies are answered from it.
+
 ## Replies stay on one number
 
 A customer must answer the number the text came from. The app sends each text from a number that can receive replies in the customer's country. When the customer replies, the app answers from the number they texted. If your account has no such number for a country, the customer still gets the text, the booking page hides the reply instructions and the dashboard says the number cannot reply.

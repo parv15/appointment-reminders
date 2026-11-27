@@ -171,7 +171,7 @@ Signing secret saved to .env as SENT_DM_WEBHOOK_SECRET
 
 ## Sending to real phones
 
-A booking always works, but a text reaches a phone only when your Sent account allows it. A new account can only text its own verified number until Sent finishes onboarding, every country needs a sender of its own, and the United States needs a registered 10DLC sender. [docs/sending-to-real-phones.md](docs/sending-to-real-phones.md) lists what the account needs, every error Sent returns and how to fix it, which countries work without documents, why US texts are rejected and the order in which to test. The dashboard shows Sent's error code and a hint under any booking whose text failed.
+A booking always works, but a text reaches a phone only when your Sent account allows it. A new account can only text its own verified number until Sent finishes onboarding, every country needs a sender of its own, and the United States needs a registered 10DLC sender, and customers in India need a real Indian number or WhatsApp to be able to reply. [docs/sending-to-real-phones.md](docs/sending-to-real-phones.md) lists what the account needs, every error Sent returns and how to fix it, which countries work without documents, why US texts are rejected and the order in which to test. The dashboard shows Sent's error code and a hint under any booking whose text failed.
 
 ## Screenshots
 
