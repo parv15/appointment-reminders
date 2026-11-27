@@ -69,7 +69,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     problems.push(`NO_REPLY_WARNING_HOURS must be a positive number, got "${env.NO_REPLY_WARNING_HOURS}"`);
   }
 
-  const timezone = env.BUSINESS_TIMEZONE ?? 'UTC';
+  const timezone = env.BUSINESS_TIMEZONE ?? 'America/New_York';
   if (!validTimezone(timezone)) {
     problems.push(`BUSINESS_TIMEZONE "${timezone}" is not a valid IANA timezone, for example America/New_York`);
   }
@@ -98,7 +98,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
 
   const defaultCountryCode = env.DEFAULT_COUNTRY_CODE?.trim() || '+1';
   if (!/^\+[1-9]\d{0,2}$/.test(defaultCountryCode)) {
-    problems.push(`DEFAULT_COUNTRY_CODE must look like +1 or +91, got "${env.DEFAULT_COUNTRY_CODE}"`);
+    problems.push(`DEFAULT_COUNTRY_CODE must look like +1 or +44, got "${env.DEFAULT_COUNTRY_CODE}"`);
   }
 
   const bookingsPerHourPerIp = Number(env.BOOKINGS_PER_HOUR_PER_IP ?? 10);

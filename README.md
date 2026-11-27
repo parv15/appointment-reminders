@@ -336,7 +336,7 @@ All settings are environment variables, usually kept in `.env`. [`.env.example`]
 | `REMINDER_OPTIONS` | `1440,120,60` | Reminder times customers can choose, in minutes before the appointment. |
 | `NO_REPLY_WARNING_HOURS` | `3` | How long before the appointment a booking without a reply is flagged. |
 | `SERVICES` | `Appointment` | Comma-separated list of services customers can book. |
-| `BUSINESS_TIMEZONE` | `UTC` | IANA timezone for business hours and for the dates in texts, for example `America/New_York`. |
+| `BUSINESS_TIMEZONE` | `America/New_York` | IANA timezone for business hours and for the dates in texts, for example `America/Chicago` or `America/Los_Angeles`. |
 | `BOOKING_START_HOUR` | `9` | First bookable hour. |
 | `BOOKING_END_HOUR` | `17` | End of the last slot. |
 | `SLOT_MINUTES` | `30` | Slot length: 10, 15, 20, 30, 45 or 60. |
@@ -381,7 +381,7 @@ curl "http://localhost:3000/api/slots?date=2026-12-03"
 
 curl -X POST http://localhost:3000/api/bookings \
   -H "Content-Type: application/json" \
-  -d '{"service": "Dental checkup", "name": "Sana Mehta", "phone": "+14155551234", "startsAt": "2026-12-03T14:30:00.000Z", "reminderMinutes": 120}'
+  -d '{"service": "Dental checkup", "name": "Emily Carter", "phone": "+14155551234", "startsAt": "2026-12-03T14:30:00.000Z", "reminderMinutes": 120}'
 ```
 
 ## Project layout

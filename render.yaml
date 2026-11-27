@@ -14,7 +14,7 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: BUSINESS_TIMEZONE
-        value: UTC
+        value: America/New_York
       - key: SERVICES
         value: Appointment
       - key: DEFAULT_COUNTRY_CODE
