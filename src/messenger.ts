@@ -144,7 +144,8 @@ export function createSentMessenger(options: { sandbox: boolean; templates: Temp
     async status(messageId) {
       const response = await client.messages.retrieveStatus(messageId);
       const channel = response.data?.channel?.toLowerCase();
-      const reason = response.data?.events?.find((event) => event.reason)?.reason;
+      const found = response.data?.events?.find((event) => event.reason);
+      const reason = found?.reason ? (found.reason_code ? `${found.reason_code}: ${found.reason}` : found.reason) : undefined;
       return { status: response.data?.status?.toLowerCase(), channel: channel && DELIVERY_CHANNELS.has(channel) ? channel : undefined, ...(reason && { reason }) };
     },
 

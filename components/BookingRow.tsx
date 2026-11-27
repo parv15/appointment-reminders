@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { isFuture, isPast } from '@/lib/client/admin';
 import { whenMedium } from '@/lib/client/booking';
+import { explainReason } from '@/lib/client/fixes';
 import { cssVars } from '@/lib/client/css';
 import { ago, channelName, label, until } from '@/lib/client/format';
 import { describePhone } from '@/lib/client/phone';
@@ -36,6 +37,7 @@ export function BookingRow({ appointment: a, config, index, isNew, onReschedule,
   const [cancelling, setCancelling] = useState(false);
   const { formatted, country } = describePhone(a.phone);
   const confirmationChannel = channelName(a.confirmationChannel);
+  const reasonNote = explainReason(a.confirmationReason ?? a.reminderReason);
 
   const cancel = async () => {
     if (!window.confirm(`Cancel ${a.name}'s appointment? Their scheduled reminder is cancelled too, and they get a text saying so.`)) return;
@@ -76,8 +78,8 @@ export function BookingRow({ appointment: a, config, index, isNew, onReschedule,
           )}
           <ReminderPill a={a} config={config} />
           {a.repliesPossible === false && isFuture(a) && <span className="reply">This number cannot reply to our texts.</span>}
-          {(a.confirmationReason || a.reminderReason) && (
-            <span className="reply">{`Sent says: ${a.confirmationReason ?? a.reminderReason}`}</span>
+          {reasonNote && (
+            <span className="reply">{`Sent says: ${reasonNote.message}${reasonNote.fix ? ` ${reasonNote.fix}` : ''}`}</span>
           )}
           {a.lastReply && <span className="reply">{`Replied "${a.lastReply}"${a.lastReplyAt ? ` ${ago(a.lastReplyAt)}` : ''}`}</span>}
         </div>

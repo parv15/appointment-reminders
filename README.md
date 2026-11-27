@@ -38,7 +38,7 @@ A missed appointment costs a business the time slot and the income. A reminder t
 | Waiting for template approval | The app uses Sent's approved templates until yours are approved, then switches to yours by itself. |
 | Fake or replayed webhooks | Signatures are checked in constant time, requests older than five minutes are refused and each event is processed once. |
 
-**Contents:** [Demo](#demo) · [How it works](#how-it-works) · [Features](#features) · [Stack](#stack) · [Prerequisites](#prerequisites) · [Quick start](#quick-start) · [Screenshots](#screenshots) · [When the reminder is sent](#when-the-reminder-is-sent) · [Replies and status](#replies-and-status) · [Key integration points](#key-integration-points) · [Failure behavior](#failure-behavior) · [Security design](#security-design) · [Configuration](#configuration) · [API](#api) · [Project layout](#project-layout) · [Deploying](#deploying) · [One-click deploy](#one-click-deploy) · [FAQ](#faq) · [Contributing](#contributing)
+**Contents:** [Demo](#demo) · [Sending to real phones](#sending-to-real-phones) · [How it works](#how-it-works) · [Features](#features) · [Stack](#stack) · [Prerequisites](#prerequisites) · [Quick start](#quick-start) · [Screenshots](#screenshots) · [When the reminder is sent](#when-the-reminder-is-sent) · [Replies and status](#replies-and-status) · [Key integration points](#key-integration-points) · [Failure behavior](#failure-behavior) · [Security design](#security-design) · [Configuration](#configuration) · [API](#api) · [Project layout](#project-layout) · [Deploying](#deploying) · [One-click deploy](#one-click-deploy) · [FAQ](#faq) · [Contributing](#contributing)
 
 ## Demo
 
@@ -168,6 +168,10 @@ $ npm run setup:webhook -- https://YOUR-TUNNEL.ngrok-free.app
 Webhook registered: https://YOUR-TUNNEL.ngrok-free.app/webhooks/sent
 Signing secret saved to .env as SENT_DM_WEBHOOK_SECRET
 ```
+
+## Sending to real phones
+
+A booking always works, but a text reaches a phone only when your Sent account allows it. A new account can only text its own verified number until Sent finishes onboarding, every country needs a sender of its own, and the United States needs a registered 10DLC sender. [docs/sending-to-real-phones.md](docs/sending-to-real-phones.md) lists what the account needs, every error Sent returns and how to fix it, which countries work without documents, why US texts are rejected and the order in which to test. The dashboard shows Sent's error code and a hint under any booking whose text failed.
 
 ## Screenshots
 
