@@ -71,7 +71,7 @@ export function BookedView({ config, booking, onReset }: Props) {
         {failed ? `We could not deliver the confirmation text. Check that the number and the country are right. Your appointment is still booked.` : ''}
       </p>
 
-      <div className="reply-guide" hidden={cancelled || config.repliesPossible === false}>
+      <div className="reply-guide" hidden={cancelled || (booking.repliesPossible ?? config.repliesPossible) === false}>
         <span className="eyebrow">How to reply to our texts</span>
         <ul>
           <li>
@@ -89,7 +89,7 @@ export function BookedView({ config, booking, onReset }: Props) {
         </ul>
         <p className="muted">
           We will text you a reminder on {reminderTime(config.timezone, booking.startsAt, booking.reminderMinutes)}, {duration(booking.reminderMinutes)} before your appointment.
-          {config.repliesPossible === false ? '' : ' You can reply to that message to confirm or to reschedule.'}
+          {(booking.repliesPossible ?? config.repliesPossible) === false ? '' : ' You can reply to that message to confirm or to reschedule.'}
         </p>
       </div>
 

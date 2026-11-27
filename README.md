@@ -221,6 +221,8 @@ The confirmation is sent at booking time and the reminder is always a separate s
 | `STOP`, `HELP` or another compliance keyword | Sent handles it and the app does nothing. |
 | Anything else | A text asks them to reply `C` or `R`. |
 
+Replies stay on one number. The app sends each text from a number that can receive replies for the customer's country, so the customer answers the same number the text came from, and the app answers from the number the customer texted. A sender ID such as a brand name cannot receive replies, so a customer in a country with no number of yours gets the texts but cannot answer them. The booking page and the dashboard say so for that customer.
+
 Matching ignores capital letters and surrounding spaces. A reply applies to the customer's next upcoming appointment, which the app finds by phone number. The answer can only be sent once a conversation window is open, and the customer's reply opens it. On SMS and RCS that happens as soon as they reply, and on WhatsApp the window lasts 24 hours after their last message.
 
 ```mermaid
@@ -290,6 +292,7 @@ try {
 | Your own templates are not approved | Sent's approved templates are used, and the dashboard says so. |
 | No template is approved at all | Startup warns you and Sent blocks the text, but the booking is not affected. |
 | Sent rejects the API key | The app refuses to start and names the variable to fix. |
+| The customer's country has no number of yours that can send there | The text goes out from the default sender, the booking page hides the reply instructions for that customer and the dashboard says the number cannot reply. |
 | The Sent account has no channel that can receive replies, such as only an alphanumeric sender ID | Texts still go out, but they are one way and customers cannot reply. The app warns at startup, shows a notice on the dashboard and hides the reply instructions on the booking page. |
 | Sent blocks a text, for example because a new account may only text its verified number | The booking stays. The dashboard shows Sent's reason under the booking, and the booking page asks the customer to check the number and country. |
 | The webhook secret is missing | The webhook answers 503 and replies are ignored. Texts still go out and their status is polled. |

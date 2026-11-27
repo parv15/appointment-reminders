@@ -48,15 +48,18 @@ export interface ApiDeps {
   config: Config;
   templateReport?: () => Promise<TemplateReport[]>;
   twoWay?: () => Promise<boolean>;
+  canReply?: (phone: string) => Promise<boolean>;
 }
 
 export type Api = (req: Request) => Promise<Response>;
 
 export function createApi(deps: ApiDeps): Api {
-  const { store, reminders, config, templateReport, twoWay } = deps;
+  const { store, reminders, config, templateReport, twoWay, canReply } = deps;
   const auth = createAdminAuth(config.adminPassword, config.trustProxy);
   const bookingLimiter = createRateLimiter(config.bookingsPerHourPerIp, 60 * 60_000);
   const defaultLead = () => config.reminderOptions[0]!;
+
+  const replyPossible = async (phone: string) => (canReply ? await canReply(phone).catch(() => true) : true);
 
   async function webhook(req: Request): Promise<Response> {
     if (!config.webhookSecret) {
@@ -144,14 +147,14 @@ export function createApi(deps: ApiDeps): Api {
     }
 
     const booking = await reminders.book({ name: name.trim(), service, phone, startsAt: start.toISOString(), reminderMinutes: minutes });
-    return json({ ...publicView(booking, defaultLead()), ...(booking.confirmationError && { alertError: booking.confirmationError }) }, 201);
+    return json({ ...publicView(booking, defaultLead()), repliesPossible: await replyPossible(booking.phone), ...(booking.confirmationError && { alertError: booking.confirmationError }) }, 201);
   }
 
   async function getBooking(id: string): Promise<Response> {
     await reminders.syncStatuses();
     const booking = await store.get(id);
     if (!booking) return json({ error: 'Booking not found.' }, 404);
-    return json(publicView(booking, defaultLead()));
+    return json({ ...publicView(booking, defaultLead()), repliesPossible: await replyPossible(booking.phone) });
   }
 
   async function reschedule(req: Request, id: string): Promise<Response> {
@@ -173,7 +176,8 @@ export function createApi(deps: ApiDeps): Api {
     if (method === 'GET' && path === '/api/admin/appointments') {
       await reminders.syncStatuses();
       const now = new Date();
-      return json((await store.list()).map((a) => ({ ...a, attention: attentionFor(a, now, config.noReplyWarningHours) })));
+      const rows = await store.list();
+      return json(await Promise.all(rows.map(async (a) => ({ ...a, attention: attentionFor(a, now, config.noReplyWarningHours), repliesPossible: await replyPossible(a.phone) }))));
     }
     if (method === 'GET' && path === '/api/admin/templates') {
       return json(templateReport ? await templateReport() : []);

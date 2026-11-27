@@ -1,4 +1,5 @@
 import SentDm from '@sentdm/sentdm';
+import { servesDestination } from './dial-codes';
 
 export interface SendRequest {
   to: string;
@@ -7,6 +8,7 @@ export interface SendRequest {
   template?: { name: string; parameters: Record<string, string> };
   scheduledAt?: Date;
   idempotencyKey?: string;
+  from?: string;
 }
 
 export interface MessageStatus {
@@ -29,6 +31,7 @@ export interface Messenger {
   templateReport(): Promise<TemplateReport[]>;
   verify(): Promise<string[]>;
   twoWay(): Promise<boolean>;
+  canReply(phone: string): Promise<boolean>;
 }
 
 export interface TemplateLists {
@@ -54,6 +57,7 @@ export function createSentMessenger(options: { sandbox: boolean; templates: Temp
   const { sandbox, templates } = options;
 
   let twoWayCache: { value: boolean; at: number } | undefined;
+  let numbersCache: { list: { country: string; number: string }[]; at: number } | undefined;
   let statuses = new Map<string, string | undefined>();
   let loadedAt = 0;
 
@@ -72,6 +76,28 @@ export function createSentMessenger(options: { sandbox: boolean; templates: Temp
     return statuses;
   }
 
+  async function replyNumbers() {
+    if (numbersCache && Date.now() - numbersCache.at < STATUS_TTL_MS) return numbersCache.list;
+    const channels = (await client.channels.list()).data;
+    const list = (channels?.sms ?? [])
+      .filter((market) => market.number_type !== 'ALPHANUMERIC')
+      .flatMap((market) =>
+        (market.numbers ?? [])
+          .filter((n) => n.status === 'ACTIVE' && n.sender_value?.startsWith('+'))
+          .map((n) => ({ country: market.country ?? '', number: n.sender_value! })),
+      );
+    numbersCache = { list, at: Date.now() };
+    return list;
+  }
+
+  async function senderFor(phone: string): Promise<string | undefined> {
+    try {
+      return (await replyNumbers()).find((n) => servesDestination(n.country, phone))?.number;
+    } catch {
+      return undefined;
+    }
+  }
+
   async function resolve(list: string): Promise<string> {
     const candidates = names(list);
     if (candidates.length <= 1) return candidates[0] ?? list;
@@ -86,9 +112,12 @@ export function createSentMessenger(options: { sandbox: boolean; templates: Temp
   return {
     async send(request) {
       const template = request.template && { ...request.template, name: await resolve(request.template.name) };
+      const from = sandbox ? undefined : (request.from ?? (await senderFor(request.to)));
+      const channel = request.channel ?? (from ? 'sms' : undefined);
       const response = await client.messages.send({
         to: [request.to],
-        ...(request.channel && { channel: [request.channel] }),
+        ...(channel && { channel: [channel] }),
+        ...(from && { channels: { [channel ?? 'sms']: [{ from: [from] }] } }),
         ...(request.text && { text: request.text }),
         ...(template && { template }),
         ...(request.scheduledAt && { scheduled_at: request.scheduledAt.toISOString() }),
@@ -134,6 +163,11 @@ export function createSentMessenger(options: { sandbox: boolean; templates: Temp
         });
       }
       return report;
+    },
+
+    async canReply(phone) {
+      if (sandbox) return true;
+      return (await senderFor(phone).catch(() => undefined)) !== undefined;
     },
 
     async twoWay() {

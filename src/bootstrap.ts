@@ -68,6 +68,6 @@ export async function createRuntime(): Promise<Runtime> {
 
   const messenger = await connectToSent(config);
   const reminders = createReminders({ store, messenger, config });
-  const api = createApi({ store, reminders, config, templateReport: () => messenger.templateReport(), twoWay: () => messenger.twoWay() });
+  const api = createApi({ store, reminders, config, templateReport: () => messenger.templateReport(), twoWay: () => messenger.twoWay(), canReply: (phone) => messenger.canReply(phone) });
   return { config, store, api };
 }

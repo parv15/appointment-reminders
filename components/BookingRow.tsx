@@ -75,6 +75,7 @@ export function BookingRow({ appointment: a, config, index, isNew, onReschedule,
             <Pill text={`Confirmation ${label(a.confirmationStatus)}${confirmationChannel ? ` via ${confirmationChannel}` : ''}`} status={a.confirmationStatus} />
           )}
           <ReminderPill a={a} config={config} />
+          {a.repliesPossible === false && isFuture(a) && <span className="reply">This number cannot reply to our texts.</span>}
           {(a.confirmationReason || a.reminderReason) && (
             <span className="reply">{`Sent says: ${a.confirmationReason ?? a.reminderReason}`}</span>
           )}

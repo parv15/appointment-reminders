@@ -24,6 +24,7 @@ class NoticeError extends Error {}
 
 export interface InboundPayload {
   inbound_number: string;
+  outbound_number?: string | null;
   channel?: string | null;
   text?: string | null;
 }
@@ -71,9 +72,9 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
   const pick = (all: Record<string, string>, fields?: string[]) =>
     fields ? Object.fromEntries(Object.entries(all).filter(([key]) => fields.includes(key))) : all;
 
-  const reply = async (to: string, channel: string | undefined, text: string) => {
+  const reply = async (to: string, channel: string | undefined, text: string, from?: string | null) => {
     try {
-      await messenger.send({ to, channel, text });
+      await messenger.send({ to, channel, text, ...(from && { from }) });
     } catch (err) {
       console.error(`Reply to ${to} failed: ${explainSentError(err)?.message ?? (err instanceof Error ? err.message : err)}`);
     }
@@ -258,12 +259,12 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
       const { date, time } = formatInZone(appointment.startsAt);
       if (intent === 'confirm') {
         await store.setStatus(appointment.id, 'confirmed');
-        await reply(phone, replyChannel, `Thanks ${appointment.name}, your appointment on ${date} at ${time} is confirmed.`);
+        await reply(phone, replyChannel, `Thanks ${appointment.name}, your appointment on ${date} at ${time} is confirmed.`, payload.outbound_number);
       } else if (intent === 'reschedule') {
         await store.setStatus(appointment.id, 'reschedule_requested');
-        await reply(phone, replyChannel, `No problem ${appointment.name}. We will contact you shortly to find a new time.`);
+        await reply(phone, replyChannel, `No problem ${appointment.name}. We will contact you shortly to find a new time.`, payload.outbound_number);
       } else {
-        await reply(phone, replyChannel, `Your appointment is on ${date} at ${time}. Reply C to confirm or R to reschedule.`);
+        await reply(phone, replyChannel, `Your appointment is on ${date} at ${time}. Reply C to confirm or R to reschedule.`, payload.outbound_number);
       }
     },
 
