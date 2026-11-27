@@ -1,21 +1,23 @@
-import type { Request, RequestHandler } from 'express';
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { clientAddress, isSecure, json } from './http';
 
-const COOKIE = 'admin_session';
+export const SESSION_COOKIE = 'admin_session';
 const SESSION_MS = 12 * 60 * 60_000;
 const MAX_FAILURES = 5;
 const FAILURE_WINDOW_MS = 5 * 60_000;
 
 export interface AdminAuth {
   enabled: boolean;
-  isSignedIn(req: Request): boolean;
-  requirePage: RequestHandler;
-  requireApi: RequestHandler;
-  login: RequestHandler;
-  logout: RequestHandler;
+  isSignedIn(cookieHeader: string | null | undefined): boolean;
+  login(req: Request, body: Record<string, unknown>): Response;
+  logout(req: Request): Response;
 }
 
-export function createAdminAuth(password: string): AdminAuth {
+function cookieFlags(req: Request, maxAge: number) {
+  return `Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${isSecure(req) ? '; Secure' : ''}`;
+}
+
+export function createAdminAuth(password: string, trustProxy: boolean | number | string = false): AdminAuth {
   const enabled = password !== '';
   const failures = new Map<string, { count: number; resetAt: number }>();
 
@@ -26,15 +28,15 @@ export function createAdminAuth(password: string): AdminAuth {
     return left.length === right.length && timingSafeEqual(left, right);
   };
 
-  const readCookie = (req: Request) =>
-    (req.header('cookie') ?? '')
+  const readCookie = (header: string | null | undefined) =>
+    (header ?? '')
       .split(';')
       .map((part) => part.trim().split('='))
-      .find(([name]) => name === COOKIE)?.[1];
+      .find(([name]) => name === SESSION_COOKIE)?.[1];
 
-  const isSignedIn = (req: Request) => {
+  const isSignedIn = (cookieHeader: string | null | undefined) => {
     if (!enabled) return true;
-    const [expires, signature] = (readCookie(req) ?? '').split('.');
+    const [expires, signature] = (readCookie(cookieHeader) ?? '').split('.');
     return Boolean(expires && signature) && Number(expires) > Date.now() && same(signature!, sign(expires!));
   };
 
@@ -42,49 +44,30 @@ export function createAdminAuth(password: string): AdminAuth {
     enabled,
     isSignedIn,
 
-    requirePage(req, res, next) {
-      if (isSignedIn(req)) next();
-      else res.redirect('/admin/login');
-    },
-
-    requireApi(req, res, next) {
-      if (isSignedIn(req)) next();
-      else res.status(401).json({ error: 'Sign in required.' });
-    },
-
-    login(req, res) {
-      const key = req.ip ?? 'unknown';
+    login(req, body) {
+      const key = clientAddress(req, trustProxy);
       for (const [address, entry] of failures) {
         if (entry.resetAt <= Date.now()) failures.delete(address);
       }
       const record = failures.get(key);
       if (record && record.resetAt > Date.now() && record.count >= MAX_FAILURES) {
-        res.status(429).json({ error: 'Too many attempts. Try again in a few minutes.' });
-        return;
+        return json({ error: 'Too many attempts. Try again in a few minutes.' }, 429);
       }
 
-      const supplied = typeof req.body?.password === 'string' ? req.body.password : '';
+      const supplied = typeof body.password === 'string' ? body.password : '';
       if (!enabled || !same(supplied, password)) {
         const fresh = record && record.resetAt > Date.now() ? record : { count: 0, resetAt: Date.now() + FAILURE_WINDOW_MS };
         failures.set(key, { ...fresh, count: fresh.count + 1 });
-        res.status(401).json({ error: 'That password is not right.' });
-        return;
+        return json({ error: 'That password is not right.' }, 401);
       }
 
       failures.delete(key);
       const expires = String(Date.now() + SESSION_MS);
-      res.cookie(COOKIE, `${expires}.${sign(expires)}`, {
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: req.secure || req.header('x-forwarded-proto') === 'https',
-        maxAge: SESSION_MS,
-      });
-      res.json({ ok: true });
+      return json({ ok: true }, 200, { 'set-cookie': `${SESSION_COOKIE}=${expires}.${sign(expires)}; ${cookieFlags(req, SESSION_MS / 1000)}` });
     },
 
-    logout(_req, res) {
-      res.clearCookie(COOKIE);
-      res.json({ ok: true });
+    logout(req) {
+      return json({ ok: true }, 200, { 'set-cookie': `${SESSION_COOKIE}=; ${cookieFlags(req, 0)}` });
     },
   };
 }

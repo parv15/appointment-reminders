@@ -1,8 +1,8 @@
-import type { Config } from './config.js';
-import { explainSentError } from './errors.js';
-import { DELIVERY_CHANNELS, type Messenger } from './messenger.js';
-import { classifyReply } from './replies.js';
-import { SlotTakenError, type Appointment, type Store } from './store.js';
+import type { Config } from './config';
+import { explainSentError } from './errors';
+import { DELIVERY_CHANNELS, type Messenger } from './messenger';
+import { classifyReply } from './replies';
+import { SlotTakenError, type Appointment, type Store } from './store';
 
 const MIN_SCHEDULE_AHEAD_MS = 2 * 60_000;
 const MAX_SCHEDULE_AHEAD_MS = 30 * 24 * 60 * 60_000;

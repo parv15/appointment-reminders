@@ -10,7 +10,7 @@ import {
   type Store,
   isUniqueViolation,
   toAppointment,
-} from './store.js';
+} from './store';
 
 const SCHEMA = `
   CREATE TABLE IF NOT EXISTS appointments (

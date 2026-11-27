@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { extname, join, relative } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
-const SKIP = new Set(['node_modules', '.git', 'dist', 'data', 'package-lock.json']);
+const SKIP = new Set(['node_modules', '.git', '.next', 'dist', 'data', 'package-lock.json', 'next-env.d.ts']);
 const TEXT = new Set(['.md', '.html', '.js', '.ts', '.json', '.yml', '.yaml']);
 
 const WORDS = [

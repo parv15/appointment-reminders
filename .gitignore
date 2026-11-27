@@ -1,4 +1,9 @@
-node_modules
-dist
-data
+*.tsbuildinfo
 .env
+.next
+AGENTS.md
+CLAUDE.md
+data
+dist
+next-env.d.ts
+node_modules

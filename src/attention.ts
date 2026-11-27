@@ -1,4 +1,4 @@
-import type { Appointment } from './store.js';
+import type { Appointment } from './store';
 
 export type Attention = 'reschedule' | 'no_reply' | null;
 

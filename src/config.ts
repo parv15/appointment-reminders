@@ -1,4 +1,4 @@
-import type { SlotRules } from './slots.js';
+import type { SlotRules } from './slots';
 
 export interface Config {
   port: number;

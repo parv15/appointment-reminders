@@ -1,18 +1,17 @@
 import SentDm from '@sentdm/sentdm';
-import type { Express } from 'express';
-import { createApp } from './app.js';
-import { ConfigError, loadConfig, type Config } from './config.js';
-import { explainSentError } from './errors.js';
-import { createSentMessenger } from './messenger.js';
-import { createReminders } from './reminders.js';
-import { openStore, type Store } from './store.js';
+import { createApi, type Api } from './api';
+import { ConfigError, loadConfig, type Config } from './config';
+import { explainSentError } from './errors';
+import { createSentMessenger } from './messenger';
+import { createReminders } from './reminders';
+import { openStore, type Store } from './store';
 
 export class StartupError extends Error {}
 
 export interface Runtime {
   config: Config;
   store: Store;
-  app: Express;
+  api: Api;
 }
 
 function readConfig(): Config {
@@ -60,8 +59,6 @@ export async function createRuntime(): Promise<Runtime> {
     throw new StartupError('Cannot start: Vercel does not keep files between requests, so set DATABASE_URL to a Postgres database, for example one from the Vercel Storage tab.');
   }
 
-  if (process.env.VERCEL && !config.trustProxy) config.trustProxy = 1;
-
   let store: Store;
   try {
     store = await openStore(config);
@@ -71,6 +68,6 @@ export async function createRuntime(): Promise<Runtime> {
 
   const messenger = await connectToSent(config);
   const reminders = createReminders({ store, messenger, config });
-  const app = createApp({ store, reminders, config, templateReport: () => messenger.templateReport(), twoWay: () => messenger.twoWay() });
-  return { config, store, app };
+  const api = createApi({ store, reminders, config, templateReport: () => messenger.templateReport(), twoWay: () => messenger.twoWay() });
+  return { config, store, api };
 }

@@ -5,7 +5,7 @@
 1. Install Node 22.13 or newer.
 2. Run `npm install`.
 3. Run `cp .env.example .env` and fill in your values.
-4. Run `npm run dev`.
+4. Run `npm run dev`. It starts Next.js on port 3000.
 
 ## Checks
 

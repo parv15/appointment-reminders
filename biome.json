@@ -1,7 +1,16 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.6.9/schema.json",
 	"files": {
-		"includes": ["src/**", "scripts/**", "public/**/*.js", "admin/**/*.js"]
+		"includes": [
+			"src/**",
+			"scripts/**",
+			"app/**/*.ts",
+			"app/**/*.tsx",
+			"components/**",
+			"lib/**",
+			"instrumentation.ts",
+			"next.config.ts"
+		]
 	},
 	"formatter": {
 		"enabled": false
@@ -29,17 +38,5 @@
 				"noNonNullAssertion": "off"
 			}
 		}
-	},
-	"overrides": [
-		{
-			"includes": ["public/**/*.js", "admin/**/*.js"],
-			"linter": {
-				"rules": {
-					"correctness": {
-						"noUnusedVariables": "off"
-					}
-				}
-			}
-		}
-	]
+	}
 }

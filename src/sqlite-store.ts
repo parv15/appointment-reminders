@@ -2,7 +2,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
-import { type Appointment, type AppointmentStatus, EVENT_RETENTION_MS, type NewAppointment, type Row, SlotTakenError, type Store, isUniqueViolation, toAppointment } from './store.js';
+import { type Appointment, type AppointmentStatus, EVENT_RETENTION_MS, type NewAppointment, type Row, SlotTakenError, type Store, isUniqueViolation, toAppointment } from './store';
 
 const COLUMNS: Record<string, string> = {
   service: 'TEXT',

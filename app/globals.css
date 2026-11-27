@@ -271,7 +271,7 @@ h2 { font-size: 17px; font-weight: 500; letter-spacing: -0.015em; }
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .stat { display: grid; gap: 6px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
 .stat span { font-size: 34px; font-weight: 500; line-height: 1; letter-spacing: -0.03em; }
-.stat label { color: var(--muted); font: 500 11px/1.4 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; }
+.stat small { color: var(--muted); font: 500 11px/1.4 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; }
 .stat.good span { color: var(--good); }
 .stat.warn span { color: var(--warn); }
 .stat.muted span { color: var(--muted); }
@@ -352,7 +352,14 @@ dialog::backdrop { background: #130f0c40; backdrop-filter: blur(3px); }
   .diagram-band { display: none; }
   .section-title { flex-wrap: wrap; }
   .tabs { border-radius: 18px; }
+  .contact .sep-when { display: none; }
+  .contact .when { display: block; }
   .topbar-inner { flex-wrap: wrap; gap: 10px; padding-top: 12px; padding-bottom: 12px; }
   .brand { min-width: 0; font-size: 16px; }
   .top-actions { flex-wrap: wrap; gap: 8px; }
 }
+
+/* Phone and country lines */
+.sub-line { display: block; color: var(--muted); font-size: 13px; font-weight: 400; }
+.contact .phone-no { white-space: nowrap; }
+.contact .sep { color: var(--faint); }

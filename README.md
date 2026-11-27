@@ -50,7 +50,7 @@ The recording scrolls through the booking portal and then the admin dashboard. I
 
 ## How it works
 
-One Node process serves the booking portal, the admin dashboard and the webhook endpoint. Bookings are stored in a local SQLite file or in Postgres, and everything that reaches a phone goes through Sent.
+One Next.js app serves the booking portal, the admin dashboard, the API and the webhook endpoint. Bookings are stored in a local SQLite file or in Postgres, and everything that reaches a phone goes through Sent.
 
 ```mermaid
 flowchart TB
@@ -65,11 +65,11 @@ flowchart TB
 
 | Part | What it does | Where |
 | --- | --- | --- |
-| Portal | Lets the customer choose a service, day, time and reminder, enter details and watch the confirmation arrive | `public/` |
-| Admin | Shows stats, bookings, the needs-attention flags and the activity feed, and opens the reschedule dialog | `admin/` |
+| Portal | Lets the customer choose a service, day, time and reminder, enter details and watch the confirmation arrive | `app/page.tsx`, `components/` |
+| Admin | Shows stats, bookings, the needs-attention flags and the activity feed, and opens the reschedule dialog | `app/admin/`, `components/` |
 | Booking logic | Handles reminder timing, booking, rescheduling, cancelling, replies and status updates | `src/reminders.ts` |
 | Messenger | Is the only code that calls the Sent SDK, and falls back between templates | `src/messenger.ts` |
-| Webhook | Verifies signatures and applies message events | `src/app.ts`, `src/signature.ts` |
+| API and webhook | Routes every request, verifies webhook signatures and applies message events | `src/api.ts`, `src/signature.ts`, `app/api/` |
 | Slots | Works out open slots from business hours in the right timezone | `src/slots.ts` |
 | Sign-in | Keeps the dashboard private behind a password | `src/auth.ts` |
 | Storage | Keeps bookings and the webhook events already processed | `src/store.ts` |
@@ -89,13 +89,15 @@ flowchart TB
 
 ## Features
 
-The booking portal lets a customer choose a service, a day and a time slot in the business timezone, enter a mobile number with a country code, and then watch the confirmation text move through queued, sent and delivered. The page keeps the confirmation on screen after a refresh, and it previews the exact texts the customer will receive while they fill in the form.
+The app is a Next.js project written in TypeScript, so the booking portal, the dashboard and the API deploy together as one application. The booking portal lets a customer choose a service, a day and a time slot in the business timezone, enter a mobile number with a country code, and then watch the confirmation text move through queued, sent and delivered. The page keeps the confirmation on screen after a refresh, and it previews the exact texts the customer will receive while they fill in the form.
 
 Customers choose when the reminder is sent, from options such as 1 day, 2 hours or 1 hour before. Options that would already be in the past are disabled, and the page shows the exact time the reminder will go out.
 
 Replies are handled automatically. `C` confirms the booking, `R` asks for a new time, and anything else gets a text explaining the options. `STOP` and the other compliance keywords stay with Sent.
 
 The admin dashboard counts bookings that asked to reschedule and bookings that have not replied as the appointment gets close, and it highlights them. A dialog moves a booking to a new slot, cancels the old reminder, schedules a new one and tells the customer. Cancelling a booking stops its reminder and sends the customer a cancellation text. Every confirmation and reminder shows its status and the channel that carried it.
+
+Phone numbers from any country work. The app shows each number in its usual grouping with the country name next to it, for example `+44 7700 900123` for the United Kingdom, and it knows the dialling codes of 78 countries. Customers get a generated avatar so a long list is easy to scan.
 
 The dashboard sits behind a sign-in page with a password. Two setup scripts create the templates and register the webhook, so the first run needs few manual steps.
 
@@ -104,10 +106,10 @@ The dashboard sits behind a sign-in page with a password. Two setup scripts crea
 | | |
 | --- | --- |
 | Runtime | Node.js 22.13 or later, TypeScript in strict mode |
-| Server | Express 5 |
+| Framework | Next.js 16 with the App Router and React 19 |
 | Data | SQLite through `node:sqlite` by default, or Postgres through `pg` when `DATABASE_URL` is set |
 | Messaging | [`@sentdm/sentdm`](https://www.npmjs.com/package/@sentdm/sentdm) 0.55, the official TypeScript SDK |
-| Frontend | Plain HTML, CSS and JavaScript, with the Inter variable font bundled |
+| Frontend | React components in TypeScript, plain CSS and the Inter variable font bundled |
 | Tooling | GitHub Actions for typecheck and build, Dependabot and Docker |
 
 ## Prerequisites
@@ -193,7 +195,7 @@ The screenshots come from a real run against a Sent account. Phone numbers are m
     <td width="50%"><img src="docs/screenshots/admin-reschedule.png" alt="Reschedule dialog with a day, a time and a reminder choice"></td>
   </tr>
   <tr>
-    <td align="center">Staff see every booking, text and reply.</td>
+    <td align="center">Staff see every booking with the customer's country, avatar, text status and reply.</td>
     <td align="center">Rescheduling moves the booking and its reminder.</td>
   </tr>
 </table>
@@ -384,18 +386,30 @@ curl -X POST http://localhost:3000/api/bookings \
 ## Project layout
 
 ```text
+app/
+  page.tsx             The booking portal
+  admin/page.tsx       The admin dashboard, behind the sign-in check
+  admin/login/page.tsx The admin sign-in page
+  api/[...path]/       Every /api route, handled by src/api.ts
+  webhooks/sent/       The Sent webhook endpoint
+  healthz/             Liveness check
+  globals.css          Styles and the bundled Inter font
+components/            Portal, slot picker, message preview, dashboard, dialogs and shared pieces
+lib/client/            Types, the fetch helper, formatters, phone and country names
 src/
-  server.ts            Entry point: starts the server and handles shutdown
-  bootstrap.ts         Builds the app from the environment, for the server and for Vercel
-  vercel.ts            Serverless entry used by api/index.js
-  app.ts               Portal, admin and webhook routes
+  api.ts               Routes, validation and error handling, written against Request and Response
+  bootstrap.ts         Builds the store, the Sent client and the API from the environment
+  runtime.ts           Keeps one runtime per server process
+  next-handler.ts      Connects the Next.js route files to the API
+  next-auth.ts         The sign-in check used by the admin pages
   reminders.ts         Booking, rescheduling, cancelling, replies and status updates
   messenger.ts         The Sent SDK wrapper, with template fallback
   slots.ts             Business hours and open slots, timezone aware
   attention.ts         Which bookings need staff attention
   activity.ts          The alerts and activity feed
-  auth.ts              Admin sign-in, session cookie and login rate limit
+  auth.ts              Admin session cookie and login rate limit
   rate-limit.ts        Booking rate limit
+  http.ts              Small helpers for JSON, body limits and client addresses
   signature.ts         Webhook signature verification
   replies.ts           Reply classification
   errors.ts            Turns Sent API errors into readable messages
@@ -403,11 +417,9 @@ src/
   store.ts             The storage interface and shared types
   sqlite-store.ts      SQLite storage
   postgres-store.ts    Postgres storage
-api/index.js           Vercel function entry
-vercel.json            Vercel build and routing settings
+instrumentation.ts     Starts the runtime and prints the startup warnings
 render.yaml            Render blueprint
-public/                Booking portal, admin sign-in page, shared styles, slot picker and font
-admin/                 Admin dashboard
+public/fonts/          The Inter variable font and its licence
 scripts/               setup:templates, setup:webhook and the prose check
 docs/                  Template definitions, diagrams, screenshots and the demo recording
 ```
@@ -423,7 +435,7 @@ docker run -p 3000:3000 --env-file .env -v reminders-data:/app/data appointment-
 
 The image reports its health through `/healthz`, and it fixes the permissions of `/app/data` itself, so a named volume, a host folder or a cloud disk all work. The container starts as root only to make that folder writable, and then runs the app as the unprivileged `node` user. Leave the volume out and add `-e DATABASE_URL=postgres://...` to use Postgres instead.
 
-Without Docker, run `npm run build` and then `npm start`.
+Without Docker, run `npm run build` and then `npm start`. Next.js reads `.env` by itself, and `PORT` sets the port.
 
 Before you go live, set `ADMIN_PASSWORD` and serve the app over HTTPS. Keep the database on a persistent volume or in Postgres. With SQLite run a single instance. The login and booking rate limits live in memory, so with several instances each one counts on its own. Register the webhook for your real domain with `npm run setup:webhook -- https://your-domain`. Messages to US numbers need 10DLC registration with Sent before they are delivered. If you ever pasted your API key somewhere it should not be, rotate it first.
 
@@ -438,7 +450,7 @@ The two buttons at the top of this page need a Postgres database, because neithe
 3. Add `BUSINESS_TIMEZONE`, `SERVICES` and `DEFAULT_COUNTRY_CODE` under **Settings, Environment Variables** if the defaults do not suit you, then redeploy.
 4. Open the project address. The booking page is at `/` and the dashboard is at `/admin/`.
 
-Vercel runs the app as a serverless function from [`api/index.js`](api/index.js), with [`vercel.json`](vercel.json) sending the API, the dashboard and the webhook to it. The tables are created on the first request. A function can run for up to 30 seconds, which is enough for a booking and its two Sent calls.
+Vercel detects the Next.js project and needs no extra settings. The API, the webhook and the dashboard run as functions that may take up to 30 seconds, which is enough for a booking and its two Sent calls. The tables are created on the first request.
 
 ### Deploy to Render
 

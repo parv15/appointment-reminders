@@ -1,7 +1,7 @@
 {
   "name": "sent-appointment-reminders",
   "version": "1.0.0",
-  "description": "Appointment reminders with reply handling on the Sent API",
+  "description": "Appointment reminders with reply handling on the Sent API, built with Next.js and TypeScript",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -9,9 +9,9 @@
     "node": ">=22.13"
   },
   "scripts": {
-    "dev": "tsx watch --env-file=.env src/server.ts",
-    "build": "tsc",
-    "start": "node --env-file-if-exists=.env dist/server.js",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
     "typecheck": "tsc --noEmit && tsc --noEmit -p scripts/tsconfig.json",
     "setup:templates": "tsx --env-file=.env scripts/setup.ts templates",
     "setup:webhook": "tsx --env-file=.env scripts/setup.ts webhook",
@@ -22,14 +22,18 @@
   },
   "dependencies": {
     "@sentdm/sentdm": "^0.55.0",
-    "express": "^5.1.0",
-    "pg": "^8.23.1"
+    "next": "^16.4.6",
+    "pg": "^8.23.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.9",
-    "@types/express": "^5.0.0",
     "@types/node": "^22.13.0",
     "@types/pg": "^8.23.1",
+    "@types/react": "^19.3.3",
+    "@types/react-dom": "^19.3.0",
     "tsx": "^4.19.0",
     "typescript": "^7.0.2"
   }

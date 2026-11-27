@@ -1,4 +1,4 @@
-import type { Config } from './config.js';
+import type { Config } from './config';
 
 
 export class SlotTakenError extends Error {}
@@ -97,9 +97,9 @@ export const toAppointment = (row: Row): Appointment => ({
 
 export async function openStore(config: Pick<Config, 'databaseUrl' | 'databasePath'>): Promise<Store> {
   if (config.databaseUrl) {
-    const { PostgresStore } = await import('./postgres-store.js');
+    const { PostgresStore } = await import('./postgres-store');
     return PostgresStore.connect(config.databaseUrl);
   }
-  const { SqliteStore } = await import('./sqlite-store.js');
+  const { SqliteStore } = await import('./sqlite-store');
   return new SqliteStore(config.databasePath);
 }
