@@ -12,6 +12,8 @@ const COLUMNS: Record<string, string> = {
   confirmation_status: 'TEXT',
   reminder_lead_minutes: 'INTEGER',
   reminder_channel: 'TEXT',
+  reminder_reason: 'TEXT',
+  confirmation_reason: 'TEXT',
   confirmation_channel: 'TEXT',
 };
 
@@ -68,9 +70,11 @@ export class SqliteStore implements Store {
       reminderMessageId: null,
       reminderStatus: null,
       reminderChannel: null,
+      reminderReason: null,
       confirmationMessageId: null,
       confirmationStatus: null,
       confirmationChannel: null,
+      confirmationReason: null,
       lastReply: null,
       lastReplyAt: null,
       createdAt: new Date().toISOString(),
@@ -153,13 +157,13 @@ export class SqliteStore implements Store {
     this.db.prepare('UPDATE appointments SET last_reply = ?, last_reply_at = ? WHERE id = ?').run(text.slice(0, 200), at.toISOString(), id);
   }
 
-  async setMessageStatus(messageId: string, status: string, channel?: string): Promise<void> {
+  async setMessageStatus(messageId: string, status: string, channel?: string, reason?: string): Promise<void> {
     this.db
-      .prepare('UPDATE appointments SET reminder_status = ?, reminder_channel = COALESCE(?, reminder_channel) WHERE reminder_message_id = ?')
-      .run(status, channel ?? null, messageId);
+      .prepare('UPDATE appointments SET reminder_status = ?, reminder_channel = COALESCE(?, reminder_channel), reminder_reason = COALESCE(?, reminder_reason) WHERE reminder_message_id = ?')
+      .run(status, channel ?? null, reason ?? null, messageId);
     this.db
-      .prepare('UPDATE appointments SET confirmation_status = ?, confirmation_channel = COALESCE(?, confirmation_channel) WHERE confirmation_message_id = ?')
-      .run(status, channel ?? null, messageId);
+      .prepare('UPDATE appointments SET confirmation_status = ?, confirmation_channel = COALESCE(?, confirmation_channel), confirmation_reason = COALESCE(?, confirmation_reason) WHERE confirmation_message_id = ?')
+      .run(status, channel ?? null, reason ?? null, messageId);
   }
 
   async claimEvent(eventId: string): Promise<boolean> {

@@ -16,9 +16,11 @@ export interface Appointment {
   reminderMessageId: string | null;
   reminderStatus: string | null;
   reminderChannel: string | null;
+  reminderReason: string | null;
   confirmationMessageId: string | null;
   confirmationStatus: string | null;
   confirmationChannel: string | null;
+  confirmationReason: string | null;
   lastReply: string | null;
   lastReplyAt: string | null;
   createdAt: string;
@@ -35,9 +37,11 @@ export interface Row {
   reminder_message_id: string | null;
   reminder_status: string | null;
   reminder_channel: string | null;
+  reminder_reason: string | null;
   confirmation_message_id: string | null;
   confirmation_status: string | null;
   confirmation_channel: string | null;
+  confirmation_reason: string | null;
   last_reply: string | null;
   last_reply_at: string | null;
   created_at: string;
@@ -65,7 +69,7 @@ export interface Store {
   delete(id: string): Promise<void>;
   setStatus(id: string, status: AppointmentStatus): Promise<void>;
   setLastReply(id: string, text: string, at: Date): Promise<void>;
-  setMessageStatus(messageId: string, status: string, channel?: string): Promise<void>;
+  setMessageStatus(messageId: string, status: string, channel?: string, reason?: string): Promise<void>;
   claimEvent(eventId: string): Promise<boolean>;
   releaseEvent(eventId: string): Promise<void>;
   close(): Promise<void>;
@@ -87,9 +91,11 @@ export const toAppointment = (row: Row): Appointment => ({
   reminderMessageId: row.reminder_message_id,
   reminderStatus: row.reminder_status,
   reminderChannel: row.reminder_channel,
+  reminderReason: row.reminder_reason,
   confirmationMessageId: row.confirmation_message_id,
   confirmationStatus: row.confirmation_status,
   confirmationChannel: row.confirmation_channel,
+  confirmationReason: row.confirmation_reason,
   lastReply: row.last_reply,
   lastReplyAt: row.last_reply_at,
   createdAt: row.created_at,

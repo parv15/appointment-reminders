@@ -24,13 +24,17 @@ const SCHEMA = `
     reminder_message_id TEXT,
     reminder_status TEXT,
     reminder_channel TEXT,
+    reminder_reason TEXT,
     confirmation_message_id TEXT,
     confirmation_status TEXT,
     confirmation_channel TEXT,
+    confirmation_reason TEXT,
     last_reply TEXT,
     last_reply_at TEXT,
     created_at TEXT NOT NULL
   );
+  ALTER TABLE appointments ADD COLUMN IF NOT EXISTS reminder_reason TEXT;
+  ALTER TABLE appointments ADD COLUMN IF NOT EXISTS confirmation_reason TEXT;
   CREATE INDEX IF NOT EXISTS appointments_phone ON appointments (phone);
   CREATE INDEX IF NOT EXISTS appointments_reminder ON appointments (reminder_message_id);
   CREATE INDEX IF NOT EXISTS appointments_confirmation ON appointments (confirmation_message_id);
@@ -64,9 +68,11 @@ export class PostgresStore implements Store {
       reminderMessageId: null,
       reminderStatus: null,
       reminderChannel: null,
+      reminderReason: null,
       confirmationMessageId: null,
       confirmationStatus: null,
       confirmationChannel: null,
+      confirmationReason: null,
       lastReply: null,
       lastReplyAt: null,
       createdAt: new Date().toISOString(),
@@ -142,9 +148,9 @@ export class PostgresStore implements Store {
     await this.pool.query('UPDATE appointments SET last_reply = $1, last_reply_at = $2 WHERE id = $3', [text.slice(0, 200), at.toISOString(), id]);
   }
 
-  async setMessageStatus(messageId: string, status: string, channel?: string): Promise<void> {
-    await this.pool.query('UPDATE appointments SET reminder_status = $1, reminder_channel = COALESCE($2, reminder_channel) WHERE reminder_message_id = $3', [status, channel ?? null, messageId]);
-    await this.pool.query('UPDATE appointments SET confirmation_status = $1, confirmation_channel = COALESCE($2, confirmation_channel) WHERE confirmation_message_id = $3', [status, channel ?? null, messageId]);
+  async setMessageStatus(messageId: string, status: string, channel?: string, reason?: string): Promise<void> {
+    await this.pool.query('UPDATE appointments SET reminder_status = $1, reminder_channel = COALESCE($2, reminder_channel), reminder_reason = COALESCE($3, reminder_reason) WHERE reminder_message_id = $4', [status, channel ?? null, reason ?? null, messageId]);
+    await this.pool.query('UPDATE appointments SET confirmation_status = $1, confirmation_channel = COALESCE($2, confirmation_channel), confirmation_reason = COALESCE($3, confirmation_reason) WHERE confirmation_message_id = $4', [status, channel ?? null, reason ?? null, messageId]);
   }
 
   async claimEvent(eventId: string): Promise<boolean> {

@@ -12,6 +12,7 @@ export interface SendRequest {
 export interface MessageStatus {
   status?: string;
   channel?: string;
+  reason?: string;
 }
 
 export interface TemplateReport {
@@ -114,7 +115,8 @@ export function createSentMessenger(options: { sandbox: boolean; templates: Temp
     async status(messageId) {
       const response = await client.messages.retrieveStatus(messageId);
       const channel = response.data?.channel?.toLowerCase();
-      return { status: response.data?.status?.toLowerCase(), channel: channel && DELIVERY_CHANNELS.has(channel) ? channel : undefined };
+      const reason = response.data?.events?.find((event) => event.reason)?.reason;
+      return { status: response.data?.status?.toLowerCase(), channel: channel && DELIVERY_CHANNELS.has(channel) ? channel : undefined, ...(reason && { reason }) };
     },
 
     async templateReport() {

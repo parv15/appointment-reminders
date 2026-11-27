@@ -28,6 +28,7 @@ export interface PublicBooking {
   startsAt: string;
   status: AppointmentStatus;
   alertStatus: string | null;
+  alertReason?: string | null;
   alertChannel: string | null;
   reminderMinutes: number;
   reminderStatus: string | null;
@@ -58,6 +59,8 @@ export interface Appointment {
   reminderChannel: string | null;
   confirmationMessageId: string | null;
   confirmationStatus: string | null;
+  confirmationReason?: string | null;
+  reminderReason?: string | null;
   confirmationChannel: string | null;
   lastReply: string | null;
   lastReplyAt: string | null;

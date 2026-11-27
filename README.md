@@ -291,6 +291,7 @@ try {
 | No template is approved at all | Startup warns you and Sent blocks the text, but the booking is not affected. |
 | Sent rejects the API key | The app refuses to start and names the variable to fix. |
 | The Sent account has no channel that can receive replies, such as only an alphanumeric sender ID | Texts still go out, but they are one way and customers cannot reply. The app warns at startup, shows a notice on the dashboard and hides the reply instructions on the booking page. |
+| Sent blocks a text, for example because a new account may only text its verified number | The booking stays. The dashboard shows Sent's reason under the booking, and the booking page asks the customer to check the number and country. |
 | The webhook secret is missing | The webhook answers 503 and replies are ignored. Texts still go out and their status is polled. |
 | The same webhook arrives twice | The event id is stored, so the event is processed once. |
 | A customer replies after the appointment | The reply is ignored, because replies only apply to upcoming appointments. |

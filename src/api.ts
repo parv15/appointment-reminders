@@ -37,6 +37,7 @@ const publicView = (a: Appointment, defaultLeadMinutes: number) => ({
   status: a.status,
   alertStatus: a.confirmationMessageId ? (a.confirmationStatus ?? 'queued') : null,
   alertChannel: a.confirmationChannel,
+  alertReason: a.confirmationReason,
   reminderMinutes: a.reminderLeadMinutes ?? defaultLeadMinutes,
   reminderStatus: a.reminderMessageId ? (a.reminderStatus ?? 'queued') : null,
 });

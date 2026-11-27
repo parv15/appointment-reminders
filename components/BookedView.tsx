@@ -68,7 +68,7 @@ export function BookedView({ config, booking, onReset }: Props) {
         </div>
       </dl>
       <p className="alert-error" hidden={!failed}>
-        {failed ? `Delivery status: ${status}. Check the number, then book again.` : ''}
+        {failed ? `We could not deliver the confirmation text. Check that the number and the country are right. Your appointment is still booked.` : ''}
       </p>
 
       <div className="reply-guide" hidden={cancelled || config.repliesPossible === false}>

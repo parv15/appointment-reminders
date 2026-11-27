@@ -48,7 +48,7 @@ export interface Reminders {
   reschedule(id: string, request: RescheduleRequest): Promise<BookingResult | undefined>;
   cancel(id: string): Promise<BookingResult | undefined>;
   handleInbound(payload: InboundPayload): Promise<void>;
-  handleStatus(event: string, payload: { message_id?: string; channel?: string }): Promise<void>;
+  handleStatus(event: string, payload: { message_id?: string; channel?: string; reason?: string }): Promise<void>;
   syncStatuses(): Promise<void>;
 }
 
@@ -270,7 +270,8 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
     async handleStatus(event, payload) {
       if (payload.message_id) {
         const channel = payload.channel?.toLowerCase();
-        await store.setMessageStatus(payload.message_id, event.replace(/^message\./, ''), channel && DELIVERY_CHANNELS.has(channel) ? channel : undefined);
+        const reason = typeof payload.reason === 'string' ? payload.reason : undefined;
+        await store.setMessageStatus(payload.message_id, event.replace(/^message\./, ''), channel && DELIVERY_CHANNELS.has(channel) ? channel : undefined, reason);
       }
     },
 
@@ -292,8 +293,8 @@ export function createReminders(deps: { store: Store; messenger: Messenger; conf
           .filter((m) => now - (lastPolled.get(m.id) ?? 0) > (m.status === 'scheduled' ? SCHEDULED_POLL_INTERVAL_MS : POLL_INTERVAL_MS))
           .map(async ({ id }) => {
             lastPolled.set(id, now);
-            const { status, channel } = await messenger.status(id);
-            if (status) await store.setMessageStatus(id, status, channel);
+            const { status, channel, reason } = await messenger.status(id);
+            if (status) await store.setMessageStatus(id, status, channel, reason);
           }),
       );
     },
