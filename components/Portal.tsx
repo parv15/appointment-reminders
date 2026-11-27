@@ -58,7 +58,7 @@ function PortalApp({ config }: { config: AppConfig }) {
   const picker = usePicker(config);
   const [view, setView] = useState<1 | 2>(1);
   const [booking, setBooking] = useState<PublicBooking | null>(null);
-  const [details, setDetails] = useState<DetailsValues>({ name: '', code: config.defaultCountryCode, number: '' });
+  const [details, setDetails] = useState<DetailsValues>({ name: '', code: config.defaultCountryCode, number: '', consent: false });
   const [pending, setPending] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
   const shownStep = useRef<number>(1);
@@ -123,7 +123,7 @@ function PortalApp({ config }: { config: AppConfig }) {
 
   const submit = useCallback(async () => {
     if (!selection) return;
-    const request: BookingRequest = { ...selection, name: details.name.trim(), phone: normalizePhone(details.number, details.code) };
+    const request: BookingRequest = { ...selection, name: details.name.trim(), phone: normalizePhone(details.number, details.code), consent: details.consent };
     setPending(true);
     const result = await attempt(() => api<CreatedBooking>('/api/bookings', { method: 'POST', body: request }));
     setPending(false);
@@ -143,7 +143,7 @@ function PortalApp({ config }: { config: AppConfig }) {
   const bookAnother = () => {
     sessionStorage.removeItem(BOOKING_KEY);
     setBooking(null);
-    setDetails({ name: '', code: config.defaultCountryCode, number: '' });
+    setDetails({ name: '', code: config.defaultCountryCode, number: '', consent: false });
     resetPicker();
     setView(1);
   };

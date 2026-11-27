@@ -18,6 +18,8 @@ export interface Config {
   sandbox: boolean;
   databasePath: string;
   databaseUrl: string;
+  privacyUrl: string;
+  termsUrl: string;
   trustProxy: boolean | number | string;
   bookingsPerHourPerIp: number;
 }
@@ -111,6 +113,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     problems.push('DATABASE_URL must be a Postgres connection string that starts with postgres:// or postgresql://');
   }
 
+  const link = (name: string) => {
+    const value = env[name]?.trim() ?? '';
+    if (value && !/^https?:\/\/\S+$/.test(value)) problems.push(`${name} must be a web address that starts with http:// or https://`);
+    return value;
+  };
+  const privacyUrl = link('PRIVACY_URL');
+  const termsUrl = link('TERMS_URL');
+
   const proxy = env.TRUST_PROXY?.trim() ?? '';
   const trustProxy: boolean | number | string = proxy === '' || proxy === 'false' ? false : proxy === 'true' ? true : /^\d+$/.test(proxy) ? Number(proxy) : proxy;
 
@@ -136,6 +146,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     sandbox: env.SENT_SANDBOX === 'true',
     databasePath: env.DATABASE_PATH ?? './data/appointments.db',
     databaseUrl,
+    privacyUrl,
+    termsUrl,
     trustProxy,
     bookingsPerHourPerIp,
   };

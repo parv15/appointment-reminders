@@ -349,6 +349,8 @@ All settings are environment variables, usually kept in `.env`. [`.env.example`]
 | `SLOT_MINUTES` | `30` | Slot length: 10, 15, 20, 30, 45 or 60. |
 | `DEFAULT_COUNTRY_CODE` | `+1` | Country code preselected on the portal. |
 | `BOOKINGS_PER_HOUR_PER_IP` | `10` | How many booking requests one address may make per hour. |
+| `PRIVACY_URL` | empty | Link to your privacy policy. The booking page shows it next to the consent box, and US carriers expect it. |
+| `TERMS_URL` | empty | Link to your terms of service. The booking page shows it next to the consent box. |
 | `TRUST_PROXY` | empty | Set to the number of proxies in front of the app, for example `1`, so that rate limits use the real visitor address. Leave it empty when the app is exposed directly. |
 | `SENT_SANDBOX` | `false` | Validates requests without sending anything. |
 | `PORT` | `3000` | HTTP port. |

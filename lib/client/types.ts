@@ -13,6 +13,8 @@ export interface AppConfig {
   sandbox: boolean;
   repliesInText: boolean;
   repliesPossible: boolean;
+  privacyUrl?: string;
+  termsUrl?: string;
 }
 
 export interface SlotsResponse {
@@ -45,6 +47,7 @@ export interface BookingRequest {
   reminderMinutes: number;
   name: string;
   phone: string;
+  consent: boolean;
 }
 
 export interface Appointment {

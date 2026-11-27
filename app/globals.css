@@ -363,3 +363,7 @@ dialog::backdrop { background: #130f0c40; backdrop-filter: blur(3px); }
 .sub-line { display: block; color: var(--muted); font-size: 13px; font-weight: 400; }
 .contact .phone-no { white-space: nowrap; }
 .contact .sep { color: var(--faint); }
+
+.form label.consent { display: flex; flex-direction: row; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.5; color: var(--muted); font-weight: 400; }
+.form label.consent input { flex: none; width: 18px; height: 18px; margin: 2px 0 0; padding: 0; accent-color: var(--fg); }
+.form label.consent a { color: var(--fg); text-decoration: underline; text-underline-offset: 2px; }

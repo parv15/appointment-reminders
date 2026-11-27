@@ -20,7 +20,7 @@ The booking is always saved. When a text fails, the dashboard shows Sent's code 
 | Code | What Sent says | Why it happens | How to fix it |
 | --- | --- | --- | --- |
 | `BUSINESS_035` | Until the account is onboarded, messages can only be sent to its verified phone number. | The account has not finished onboarding, so every other number is blocked. | Finish KYC in the Sent dashboard. Check `onboarding.status` until it says `ONBOARDED`, or ask Sent support. Test with your verified number meanwhile. |
-| `DELIVERY_003` | The account has no sender set up for this destination on this channel. | You have no sender that can reach this country, or the country needs a registered sender. | Add a sender for the country. For the United States this means a registered 10DLC sender, which is explained below. |
+| `DELIVERY_003` | The account has no sender set up for this destination on this channel. | You have no sender that can reach this country, or the country needs a registered sender. | Add the market for the country with `POST /v3/channels/sms` or in the dashboard. For the United States this means a registered 10DLC sender, which is explained below. |
 | `BUSINESS_029` | A number the text was pinned to is not an active sender. | The app picked a number that is not active on the account. | Check the numbers under Channels and wait until the number is `ACTIVE`. |
 
 If a code is not in this table, search the [Sent error catalog](https://docs.sent.dm/reference/api/error-catalog) for it.
@@ -33,23 +33,56 @@ A sender is added per country. Sender names (alphanumeric senders) send only. A 
 | --- | --- | --- |
 | Germany, Netherlands, Austria, Switzerland, Denmark, Poland, Portugal, Greece, Hungary, Bahrain, Israel, South Africa, Mexico, Argentina, Chile, Colombia, Japan, South Korea, Hong Kong, Spain, Belgium, UAE, Saudi Arabia, Peru, Malaysia, Philippines, New Zealand, Canada | A sender name was added through the API with no documents. | A sender name of 3 to 11 letters. These senders send only. |
 | United Kingdom, Australia, Singapore, France, Italy, Sweden, Norway, Finland, Ireland and others | Not possible through the API. | Documents uploaded in the Sent dashboard. |
-| United States | A plain local number was created, but Sent refused every text to US phones. | A registered 10DLC sender, explained below. |
+| United States | A plain local number was created, but Sent failed every text to US phones with `DELIVERY_003`. | A registered 10DLC sender, which takes 1 to 3 business days after you apply. See the United States section. |
 
 Adding a sender uses `client.channels.sms.create({ country, number_type, sender_value })`, and the same can be done in the dashboard. Sent's `compliance.setup_plan` tool says whether a country can be completed through the API.
 
-## United States: why it is rejected
+## United States: why it is rejected, and how to fix it
 
-US carriers only accept business texts from numbers registered with The Campaign Registry. This is called 10DLC. A local US number that is not registered cannot send to US phones, and Sent reports `DELIVERY_003`. The app therefore does not count a US or Canada local number as able to send.
+A text to a US phone fails with `DELIVERY_003` ("the account has no sender set up for this destination on this channel") until your account has a registered US sender. US carriers only accept business texts from numbers registered with The Campaign Registry. This is called 10DLC. A plain local US number cannot send to US phones, so the app does not count a US or Canada local number as able to send. Sent's error catalog gives the fix as "add the market", and for the United States that means completing the registration below.
 
-To register you give Sent:
+### Register in the Sent dashboard
 
-- Your legal business name, business type, tax ID (EIN) and business address
-- A contact name, email and phone number
-- Your website, a privacy policy link and a terms link
-- A description of the texts, how customers agree to receive them, and two or three sample messages
-- The opt-in, opt-out and help wording for START, STOP and HELP
+1. Open **Compliance** in the sidebar and select **Apply** on the US 10DLC notice, or go straight to https://app.sent.dm/dashboard/brand-registration.
+2. Fill in the form. The sections below say what to enter.
+3. Sent's compliance team reviews it and gives feedback, then submits it to the registry. Most registrations are approved within 1 to 3 business days. Support at support@sent.dm usually answers within one business day.
+4. When it is approved, open **Channels**, then the SMS tab, and check that the United States shows `ACTIVE`. New texts to US phones then deliver, and nothing in the app changes.
 
-Approval takes days and Sent charges registration fees. Until it is approved, test with a country that does not need it.
+Fees: the registry's pass-through fees are waived for the first 12 months (low-volume mixed is $1.50 a month and standard is $10 a month afterwards). Sent charges its own campaign fee as well. The dashboard shows the exact amount before you confirm.
+
+### What to enter
+
+| Field | What to enter for this app |
+| --- | --- |
+| Brand name | The name customers know, for example `Maple Street Dental`. Do not use a legal entity suffix if your website and receipts do not. |
+| Business details | Legal business name, business type, tax ID (EIN), address, website, and a contact name, email and phone. These come from your KYC form. |
+| Campaign type | Appointment reminders. For a small business pick low-volume mixed, which allows up to 2,000 messages a day. |
+| Campaign description | One or two sentences: `Maple Street Dental sends appointment confirmations and reminders to patients who book online, and answers their replies.` |
+| Opt-in method | Web form. Give the address of your booking page. |
+| Privacy and terms | Links to your privacy policy and terms of service. Set `PRIVACY_URL` and `TERMS_URL` so the booking page shows them next to the consent box. |
+
+Sent's guide says a web form is rejected when any of these is missing before the customer submits: the program name, the message frequency, "Msg and data rates may apply", how to opt out, links to the privacy policy and terms, an explicit consent box that is not pre-checked. The booking page in this repo shows all of them in the consent box above the Confirm button, and the Confirm button stays disabled until the box is ticked. Add your privacy and terms links before you submit.
+
+### Autoresponses and sample messages
+
+Every campaign needs three documented autoresponses. Replace the brand name with yours.
+
+| Autoresponse | Text |
+| --- | --- |
+| Opt-in confirmation | `Maple Street Dental: Welcome! Reply HELP for help. Message frequency varies. Msg and data rates may apply. Reply STOP to opt out.` |
+| Opt-out confirmation | `Maple Street Dental: You have been unsubscribed and will not receive more messages.` |
+| Help response | `Maple Street Dental: For help, email help@yourdomain.com or call 555 0100.` |
+
+Appointment reminders need at least one sample message with the brand name. Use texts like the ones the app sends:
+
+- `Maple Street Dental: Hello Emily, your appointment on Nov 28, 2026 at 10:00 AM is confirmed.`
+- `Maple Street Dental: This is a reminder about your appointment on Nov 28, 2026 at 10:00 AM. Reply C to confirm or R to reschedule.`
+
+The `STOP`, `START` and `HELP` keywords are answered by Sent. You can only send what your registered use case covers, so do not use this number for marketing.
+
+### If it is rejected
+
+Sent's compliance team tells you what to correct and how to resubmit. The most common cause is the opt-in form, so check that every element listed above is visible on your booking page.
 
 ## Replies stay on one number
 

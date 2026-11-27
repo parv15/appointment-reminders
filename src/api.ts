@@ -115,6 +115,8 @@ export function createApi(deps: ApiDeps): Api {
       maxAdvanceDays: config.slotRules.maxAdvanceDays,
       days: upcomingDays(new Date(), config.timezone, config.slotRules.maxAdvanceDays + 1),
       confirmationAlerts: config.confirmationTemplateName !== '',
+      privacyUrl: config.privacyUrl,
+      termsUrl: config.termsUrl,
     });
   }
 
@@ -130,7 +132,8 @@ export function createApi(deps: ApiDeps): Api {
     if (!bookingLimiter.allow(clientAddress(req, config.trustProxy))) {
       return json({ error: 'Too many booking attempts from this connection. Try again in an hour.' }, 429);
     }
-    const { service, name, phone, startsAt, reminderMinutes } = await readJson(req);
+    const { service, name, phone, startsAt, reminderMinutes, consent } = await readJson(req);
+    if (consent !== true) throw new ValidationError('Please agree to receive text messages about this booking.');
     if (typeof service !== 'string' || !config.services.includes(service)) throw new ValidationError('Choose a service.');
     if (typeof name !== 'string' || !NAME.test(name.trim())) {
       throw new ValidationError('Enter your name using letters only (2 to 30 characters).');
