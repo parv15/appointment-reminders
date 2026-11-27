@@ -80,7 +80,7 @@ export function createSentMessenger(options: { sandbox: boolean; templates: Temp
     if (numbersCache && Date.now() - numbersCache.at < STATUS_TTL_MS) return numbersCache.list;
     const channels = (await client.channels.list()).data;
     const list = (channels?.sms ?? [])
-      .filter((market) => market.number_type !== 'ALPHANUMERIC')
+      .filter((market) => market.number_type !== 'ALPHANUMERIC' && !(market.number_type === 'LOCAL' && (market.country === 'US' || market.country === 'CA')))
       .flatMap((market) =>
         (market.numbers ?? [])
           .filter((n) => n.status === 'ACTIVE' && n.sender_value?.startsWith('+'))
