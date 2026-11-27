@@ -45,7 +45,6 @@ const COUNTRIES: readonly Country[] = [
   { code: '+84', name: 'Vietnam', groups: [2, 3, 4] },
   { code: '+86', name: 'China', groups: [3, 4, 4] },
   { code: '+90', name: 'Turkey', groups: [3, 3, 4] },
-  { code: '+91', name: 'India', groups: [5, 5] },
   { code: '+92', name: 'Pakistan', groups: [3, 7] },
   { code: '+93', name: 'Afghanistan', groups: [2, 3, 4] },
   { code: '+94', name: 'Sri Lanka', groups: [2, 3, 4] },

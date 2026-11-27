@@ -1,45 +1,56 @@
-# Sending to real phones
+# Why a text may not send, and the compliance you need to apply for
 
-The app can book and schedule without any of this. A text only reaches a phone when your Sent account allows it. This page lists what the account needs, why Sent rejects or blocks a text, and how to fix each case. Every error code below is the one Sent reports, and the dashboard shows it under the booking with a short hint.
+A booking always works. A text only reaches a phone when your Sent account is allowed to send to that country, and many countries make you register before they allow business texts. This is the usual reason a booking shows "failed" or "blocked" while the app itself is fine. This page explains each cause, which registration fixes it and how to apply.
 
-## What a real text needs
+## The short version
 
-| Requirement | What it means | Where you set it |
+| What you see | Why it happens | What to apply for |
 | --- | --- | --- |
-| An onboarded account | A new account can only text its own verified number until Sent finishes onboarding. | Sent dashboard, KYC, then wait for the status to change to `ONBOARDED`. |
-| A sender for each country | Sent sends from a sender you own in the customer's country. | Sent dashboard, Channels, or the API call shown under Countries. |
-| A sender that can receive replies | Replies only work when the text came from a real number, WhatsApp or RCS. A sender name cannot receive replies. | Sent dashboard, Channels. |
-| Approved templates | Sent only sends approved templates. Your own reply templates can stay pending, because the app falls back to Sent's standard templates. | `npm run setup:templates`, then wait for approval. |
-| Credit balance | Messages are blocked when the balance runs out. | Sent dashboard, Billing. |
-| A webhook | Replies and delivery updates reach the app through the webhook. | `npm run setup:webhook -- https://your-address`. |
+| Only your own number receives texts, others are `blocked` with `BUSINESS_035` | The Sent account is not onboarded yet. | Finish identity and business verification (KYC) in the Sent dashboard. |
+| A text to a country fails with `DELIVERY_003` | The account has no sender set up for that country. | Add a sender for the country. Some countries need a registration or documents first. |
+| Texts to US phones fail with `DELIVERY_003` | US carriers only accept business texts from registered numbers. | Register for 10DLC, the US business texting registration. |
+| Customers get texts but their reply goes nowhere | The text came from a sender name, which cannot receive replies. | Add a real number in that country, or connect WhatsApp. |
+| The text has no "Reply C or R" sentence | Your reply templates are not approved yet. | Wait for Sent to approve them. Replies still work without them. |
+| Texts stop with a balance error | The account is out of credit. | Add credit in Billing. |
 
-## Why Sent rejects or blocks a text
+## Compliance checklist
 
-The booking is always saved. When a text fails, the dashboard shows Sent's code and a hint under the booking.
+Work down this list once, in this order.
 
-| Code | What Sent says | Why it happens | How to fix it |
+1. **Onboarding (KYC).** In the Sent dashboard, complete the verification flow and add a payment method. Check the result with the status tool in the last section. It must read `ONBOARDED`. Until then Sent only lets the account text its verified number.
+2. **A sender for each country you text.** In **Channels**, add the country. Sender names (alphanumeric senders) are the simplest, they need 3 to 11 letters and they send only. Some countries need documents uploaded in the dashboard. A few countries accept a sender name through the API with no documents, and Sent's `compliance.setup_plan` tool tells you which.
+3. **US registration (10DLC).** Needed before any text reaches a US phone. See the United States section.
+4. **A way to receive replies.** A real number in the customer's country, or WhatsApp. See Replies stay on one number.
+5. **Templates.** Run `npm run setup:templates`. Your own templates add the reply instruction and need approval. Sent's standard templates work in the meantime.
+6. **A webhook.** Run `npm run setup:webhook -- https://your-address` so that delivery updates and replies reach the app.
+
+## Error codes
+
+When a text fails, the dashboard shows Sent's code and a hint under the booking.
+
+| Code | What Sent says | Cause | Fix |
 | --- | --- | --- | --- |
-| `BUSINESS_035` | Until the account is onboarded, messages can only be sent to its verified phone number. | The account has not finished onboarding, so every other number is blocked. | Finish KYC in the Sent dashboard. Check `onboarding.status` until it says `ONBOARDED`, or ask Sent support. Test with your verified number meanwhile. |
-| `DELIVERY_003` | The account has no sender set up for this destination on this channel. | You have no sender that can reach this country, or the country needs a registered sender. | Add the market for the country with `POST /v3/channels/sms` or in the dashboard. For the United States this means a registered 10DLC sender, which is explained below. |
-| `BUSINESS_029` | A number the text was pinned to is not an active sender. | The app picked a number that is not active on the account. | Check the numbers under Channels and wait until the number is `ACTIVE`. |
+| `BUSINESS_035` | Until the account is onboarded, messages can only be sent to its verified phone number. | The account has not finished onboarding. | Finish KYC, wait for `ONBOARDED`, or ask Sent support. Test with the verified number meanwhile. |
+| `DELIVERY_003` | The account has no sender set up for this destination on this channel. | No sender covers the country, or the country needs a registered sender. | Add the market for the country in **Channels** or with `POST /v3/channels/sms`. For the United States, complete 10DLC. |
+| `BUSINESS_029` | A number the text was pinned to is not an active sender. | The chosen number is not active on the account. | Wait until the number shows `ACTIVE` under **Channels**. |
 
-If a code is not in this table, search the [Sent error catalog](https://docs.sent.dm/reference/api/error-catalog) for it.
+For any other code, search the [Sent error catalog](https://docs.sent.dm/reference/api/error-catalog).
 
-## Countries
+## Adding a country
 
-A sender is added per country. Sender names (alphanumeric senders) send only. A real number can also receive replies.
+A sender is added per country, in the dashboard under **Channels** or with `client.channels.sms.create({ country, number_type, sender_value })`. Sender names send only. A real number can also receive replies.
 
-| Country group | What worked when this was tested | What it needs |
-| --- | --- | --- |
-| Germany, Netherlands, Austria, Switzerland, Denmark, Poland, Portugal, Greece, Hungary, Bahrain, Israel, South Africa, Mexico, Argentina, Chile, Colombia, Japan, South Korea, Hong Kong, Spain, Belgium, UAE, Saudi Arabia, Peru, Malaysia, Philippines, New Zealand, Canada | A sender name was added through the API with no documents. | A sender name of 3 to 11 letters. These senders send only. |
-| United Kingdom, Australia, Singapore, France, Italy, Sweden, Norway, Finland, Ireland and others | Not possible through the API. | Documents uploaded in the Sent dashboard. |
-| United States | A plain local number was created, but Sent failed every text to US phones with `DELIVERY_003`. | A registered 10DLC sender, which takes 1 to 3 business days after you apply. See the United States section. |
+| Country group | What to expect |
+| --- | --- |
+| Many countries in Europe, the Middle East, Africa and Latin America, plus Japan, South Korea and Hong Kong | A sender name was added through the API without documents. These send only. |
+| Countries such as the United Kingdom, Australia, Singapore, France and Italy | Documents must be uploaded in the Sent dashboard. The API refuses them. |
+| United States | A plain local number is not enough. Register for 10DLC. |
 
-Adding a sender uses `client.channels.sms.create({ country, number_type, sender_value })`, and the same can be done in the dashboard. Sent's `compliance.setup_plan` tool says whether a country can be completed through the API.
+A number from one country cannot send to another country. A US number sending to a phone elsewhere fails with `DELIVERY_003`, so each country you serve needs its own sender.
 
 ## United States: why it is rejected, and how to fix it
 
-A text to a US phone fails with `DELIVERY_003` ("the account has no sender set up for this destination on this channel") until your account has a registered US sender. US carriers only accept business texts from numbers registered with The Campaign Registry. This is called 10DLC. A plain local US number cannot send to US phones, so the app does not count a US or Canada local number as able to send. Sent's error catalog gives the fix as "add the market", and for the United States that means completing the registration below.
+A text to a US phone fails with `DELIVERY_003` ("the account has no sender set up for this destination on this channel") until your account has a registered US sender. US carriers only accept business texts from numbers registered with The Campaign Registry. This is called 10DLC. A plain local US number cannot send to US phones, so the app does not count a US or Canada local number as able to send.
 
 ### Register in the Sent dashboard
 
@@ -84,38 +95,11 @@ The `STOP`, `START` and `HELP` keywords are answered by Sent. You can only send 
 
 Sent's compliance team tells you what to correct and how to resubmit. The most common cause is the opt-in form, so check that every element listed above is visible on your booking page.
 
-## India: why customers there cannot reply, and how to fix it
-
-What was observed on a real account:
-
-- A sender name worked for sending. A text to an Indian phone was delivered by SMS from the sender name.
-- A sender name cannot receive replies. A customer who answers `C` has nowhere to send it.
-- A real Indian local number was requested through `POST /v3/channels/sms` with `country: 'IN'` and `number_type: 'LOCAL'`. It stayed in `PROVISIONING` with reason `CHANNEL_011` ("Sent is setting this market up") for more than a day. Sent's requirements tool publishes no steps for India, so nothing could be submitted from the account side.
-- A number from another country cannot stand in. A US number sending to an Indian phone fails with `DELIVERY_003`.
-
-India also regulates business SMS. The telecom regulator (TRAI) requires senders to register with the operators' DLT system, usually the business, the sender header and each message template, and sender-name delivery depends on that. Sent does not publish India requirements in its API, so confirm with Sent whether it handles this registration for you.
-
-### How to get it fixed
-
-| Option | Replies work | What to do |
-| --- | --- | --- |
-| Ask Sent about the Indian number | Yes, once the number is `ACTIVE` | Email support@sent.dm with the message below and ask what is blocking `CHANNEL_011` and whether India needs DLT details from you. |
-| WhatsApp | Yes, for customers in any country | Open **Channels**, then the WhatsApp tab, and connect a WhatsApp Business account through Meta. The app then answers on the same channel the customer used. |
-| Keep the sender name | No, outgoing only | Customers get the confirmation and reminder but cannot answer. The booking page and the dashboard say so for Indian numbers. |
-
-Message to send to support:
-
-> Subject: India LOCAL number stuck in PROVISIONING (CHANNEL_011)
->
-> Customer ID: your customer ID from the Sent dashboard
->
-> I requested an India LOCAL SMS number through POST /v3/channels/sms more than a day ago. The market still shows PROVISIONING with CHANNEL_011 and no number assigned. Please tell me what is blocking it, and whether I need to give you DLT registration details (entity, sender header, message templates) for India. I want customers in India to be able to reply to my appointment texts. If a local number is not possible, please tell me the supported way to receive replies from Indian phones, for example WhatsApp.
-
-When the Indian number turns `ACTIVE`, nothing in the app changes. The next text to an Indian phone goes out from that number, and replies are answered from it.
-
 ## Replies stay on one number
 
 A customer must answer the number the text came from. The app sends each text from a number that can receive replies in the customer's country. When the customer replies, the app answers from the number they texted. If your account has no such number for a country, the customer still gets the text, the booking page hides the reply instructions and the dashboard says the number cannot reply.
+
+To let customers reply in a country, add a real number in that country, or connect WhatsApp under **Channels**, which works for customers anywhere. If Sent leaves a number in `PROVISIONING` for a long time, email support@sent.dm with the market's status code and ask what it is waiting for.
 
 A plain-text reply is only allowed after the customer has texted you first. That is why the app answers replies in free text but sends the booking and reminder as templates.
 

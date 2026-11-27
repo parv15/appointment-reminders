@@ -38,7 +38,7 @@ A missed appointment costs a business the time slot and the income. A reminder t
 | Waiting for template approval | The app uses Sent's approved templates until yours are approved, then switches to yours by itself. |
 | Fake or replayed webhooks | Signatures are checked in constant time, requests older than five minutes are refused and each event is processed once. |
 
-**Contents:** [Demo](#demo) · [Sending to real phones](#sending-to-real-phones) · [How it works](#how-it-works) · [Features](#features) · [Stack](#stack) · [Prerequisites](#prerequisites) · [Quick start](#quick-start) · [Screenshots](#screenshots) · [When the reminder is sent](#when-the-reminder-is-sent) · [Replies and status](#replies-and-status) · [Key integration points](#key-integration-points) · [Failure behavior](#failure-behavior) · [Security design](#security-design) · [Configuration](#configuration) · [API](#api) · [Project layout](#project-layout) · [Deploying](#deploying) · [One-click deploy](#one-click-deploy) · [FAQ](#faq) · [Contributing](#contributing)
+**Contents:** [Demo](#demo) · [Why a text may not send](#why-a-text-may-not-send) · [How it works](#how-it-works) · [Features](#features) · [Stack](#stack) · [Prerequisites](#prerequisites) · [Quick start](#quick-start) · [Screenshots](#screenshots) · [When the reminder is sent](#when-the-reminder-is-sent) · [Replies and status](#replies-and-status) · [Key integration points](#key-integration-points) · [Failure behavior](#failure-behavior) · [Security design](#security-design) · [Configuration](#configuration) · [API](#api) · [Project layout](#project-layout) · [Deploying](#deploying) · [One-click deploy](#one-click-deploy) · [FAQ](#faq) · [Contributing](#contributing)
 
 ## Demo
 
@@ -169,9 +169,19 @@ Webhook registered: https://YOUR-TUNNEL.ngrok-free.app/webhooks/sent
 Signing secret saved to .env as SENT_DM_WEBHOOK_SECRET
 ```
 
-## Sending to real phones
+## Why a text may not send
 
-A booking always works, but a text reaches a phone only when your Sent account allows it. A new account can only text its own verified number until Sent finishes onboarding, every country needs a sender of its own, and the United States needs a registered 10DLC sender, and customers in India need a real Indian number or WhatsApp to be able to reply. [docs/sending-to-real-phones.md](docs/sending-to-real-phones.md) lists what the account needs, every error Sent returns and how to fix it, which countries work without documents, why US texts are rejected and the order in which to test. The dashboard shows Sent's error code and a hint under any booking whose text failed.
+A booking always works. A text only reaches a phone when your Sent account is allowed to send to that country, and many countries make you register before they allow business texts. If a booking shows "failed" or "blocked" the app is working. The account is missing a registration. Apply for it once and every later booking delivers.
+
+| What you see | Why it happens | What to apply for |
+| --- | --- | --- |
+| Only your own number receives texts, others are blocked | The Sent account is not onboarded yet. | Finish identity and business verification (KYC) in the Sent dashboard. |
+| A country fails with `DELIVERY_003` | The account has no sender for that country. | Add a sender for the country in **Channels**. Some countries need documents. |
+| Texts to US phones fail | US carriers only accept registered business senders. | Register for 10DLC, the US business texting registration. It takes 1 to 3 business days. |
+| Customers cannot reply | The text came from a sender name, which cannot receive replies. | Add a real number in that country, or connect WhatsApp. |
+| The text has no "Reply C or R" sentence | Your reply templates are not approved yet. | Wait for Sent. Replies work without them. |
+
+The dashboard shows Sent's error code and a hint under any booking whose text failed. [docs/sending-to-real-phones.md](docs/sending-to-real-phones.md) is the full how-to: the registration checklist, every error code, the exact 10DLC form text to paste, why replies must stay on one number and the order to test in.
 
 ## Screenshots
 
