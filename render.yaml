@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: sent-appointment-reminders
+    name: appointment-reminders
     runtime: docker
     plan: free
     healthCheckPath: /healthz

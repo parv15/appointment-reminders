@@ -1,5 +1,5 @@
 {
-  "name": "sent-appointment-reminders",
+  "name": "appointment-reminders",
   "version": "1.0.0",
   "description": "Appointment reminders with reply handling on the Sent API, built with Next.js and TypeScript",
   "private": true,

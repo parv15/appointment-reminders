@@ -7,7 +7,7 @@
 This project is a booking portal and an admin dashboard for businesses that take appointments, built on the [Sent](https://sent.dm) messaging API. A customer picks a time online and receives a confirmation text straight away. Sent holds a reminder and delivers it before the appointment, on whichever channel suits the customer. The customer can answer the reminder with `C` to confirm or `R` to ask for a new time, and the booking updates itself. You can use it as a starting point for a clinic, a salon or a repair shop, or read it as a worked example of a Sent integration with scheduled sends, delivery tracking, signed webhooks and safe retries.
 
 <p>
-  <a href="https://github.com/parv15/sent-appointment-reminders/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/parv15/sent-appointment-reminders/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/parv15/appointment-reminders/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/parv15/appointment-reminders/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="Node 22.13 or later" src="https://img.shields.io/badge/node-%E2%89%A522.13-339933?logo=node.js&logoColor=white">
   <img alt="TypeScript strict" src="https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white">
   <img alt="Sent SDK 0.55" src="https://img.shields.io/badge/%40sentdm%2Fsentdm-0.55-000000">
@@ -15,8 +15,8 @@ This project is a booking portal and an admin dashboard for businesses that take
 </p>
 
 <p>
-  <a href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fparv15%2Fsent-appointment-reminders&project-name=sent-appointment-reminders&repository-name=sent-appointment-reminders&env=SENT_DM_API_KEY,BUSINESS_NAME,ADMIN_PASSWORD,DATABASE_URL&envDescription=Your%20Sent%20API%20key%2C%20your%20business%20name%2C%20an%20admin%20password%20and%20a%20Postgres%20connection%20string&envLink=https%3A%2F%2Fgithub.com%2Fparv15%2Fsent-appointment-reminders%23one-click-deploy"><img alt="Deploy with Vercel" src="https://vercel.com/button"></a>
-  <a href="https://render.com/deploy?repo=https://github.com/parv15/sent-appointment-reminders"><img alt="Deploy to Render" src="https://render.com/images/deploy-to-render-button.svg"></a>
+  <a href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fparv15%2Fappointment-reminders&project-name=appointment-reminders&repository-name=appointment-reminders&env=SENT_DM_API_KEY,BUSINESS_NAME,ADMIN_PASSWORD,DATABASE_URL&envDescription=Your%20Sent%20API%20key%2C%20your%20business%20name%2C%20an%20admin%20password%20and%20a%20Postgres%20connection%20string&envLink=https%3A%2F%2Fgithub.com%2Fparv15%2Fappointment-reminders%23one-click-deploy"><img alt="Deploy with Vercel" src="https://vercel.com/button"></a>
+  <a href="https://render.com/deploy?repo=https://github.com/parv15/appointment-reminders"><img alt="Deploy to Render" src="https://render.com/images/deploy-to-render-button.svg"></a>
 </p>
 
 Both buttons deploy the app with your own Postgres database, because neither Vercel nor Render keeps files between restarts on a free plan. The steps are listed under [One-click deploy](#one-click-deploy).
@@ -119,8 +119,8 @@ You need Node.js 22.13 or later and a [Sent](https://app.sent.dm) account with a
 ## Quick start
 
 ```bash
-git clone https://github.com/parv15/sent-appointment-reminders.git
-cd sent-appointment-reminders
+git clone https://github.com/parv15/appointment-reminders.git
+cd appointment-reminders
 npm install
 cp .env.example .env
 ```
